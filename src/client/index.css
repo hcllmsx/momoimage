@@ -862,7 +862,7 @@ body {
 }
 
 /* ---------- 动画 ---------- */
-@keyframes slideUp {
+@keyframes barSlideUp {
   from {
     opacity: 0;
     transform: translate(-50%, 20px);

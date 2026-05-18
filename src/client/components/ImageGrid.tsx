@@ -530,7 +530,7 @@ export function ImageGrid({
           boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)",
           zIndex: 1000,
           backdropFilter: "blur(8px)",
-          animation: "slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+          animation: "barSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards",
         }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>
             已选择 {selectedIds.length} 张图片
