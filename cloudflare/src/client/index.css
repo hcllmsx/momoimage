@@ -344,6 +344,13 @@ body,
   background: rgba(248, 113, 113, 0.1);
 }
 
+.btn--delete:hover {
+  background: var(--color-error) !important;
+  color: #ffffff !important;
+  border-color: var(--color-error) !important;
+  box-shadow: 0 0 12px rgba(248, 113, 113, 0.45) !important;
+}
+
 .btn--sm {
   padding: 4px 10px;
   font-size: 12px;

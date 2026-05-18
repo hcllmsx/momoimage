@@ -400,7 +400,7 @@ export function ImageGrid({
                       🔗
                     </button>
                     <button
-                      className="btn btn--danger btn--sm"
+                      className="btn btn--ghost btn--sm btn--delete"
                       onClick={() => {
                         if (confirm("确定要删除这张图片吗？")) {
                           onDelete(image.id);
