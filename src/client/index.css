@@ -53,6 +53,46 @@
   --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ---------- CSS 变量（白天模式） ---------- */
+.light-theme {
+  /* 主色调：稍微加深的温暖琥珀金，以保在亮底上的可读性与对比度 */
+  --color-primary: #d97706;
+  --color-primary-hover: #b45309;
+  --color-primary-active: #78350f;
+  --color-primary-subtle: rgba(217, 119, 6, 0.08);
+
+  /* 背景 */
+  --color-bg-base: #f3f4f6;
+  --color-bg-elevated: #ffffff;
+  --color-bg-surface: #ffffff;
+  --color-bg-hover: #f1f3f6;
+  --color-bg-input: #f1f3f6;
+
+  /* 文本 */
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-tertiary: #9ca3af;
+  --color-text-inverse: #ffffff;
+
+  /* 边框 */
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-border-hover: rgba(0, 0, 0, 0.16);
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 20px rgba(217, 119, 6, 0.06);
+}
+
+/* ---------- 白天模式下的额外微调 ---------- */
+.light-theme ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+.light-theme ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
 /* ---------- 基础重置 ---------- */
 *,
 *::before,

@@ -376,9 +376,9 @@ export function ImageGrid({
                 <div className="image-card__overlay">
                   <div className="image-card__actions" style={{ gap: 6 }}>
                     <button
-                      className="btn btn--primary btn--sm"
+                      className="btn btn--ghost btn--sm"
                       title="图片详情"
-                      style={{ flex: 1 }}
+                      style={{ minWidth: 32, padding: 0 }}
                       onClick={() => onCopyLink(image)}
                     >
                       📋
