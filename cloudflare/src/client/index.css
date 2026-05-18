@@ -746,16 +746,9 @@ code {
 }
 
 .login-logo {
-  width: 64px;
-  height: 64px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, var(--color-primary), #e07030);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--color-text-inverse);
   margin: 0 auto 16px;
 }
 
