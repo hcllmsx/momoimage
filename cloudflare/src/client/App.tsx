@@ -228,55 +228,14 @@ export default function App() {
     localStorage.setItem("momoimage_domain_banner_dismissed", "true");
   };
 
-  // 需要初始化配置
-  if (systemInfo?.needSetup) {
-    return (
-      <ToastContext.Provider value={{ showToast }}>
-        <div className="login-container">
-          <div className="login-card card">
-            <div className="card__body" style={{ padding: 32 }}>
-              <div className="login-logo">M</div>
-              <h1 className="login-title">默默图床</h1>
-              <p className="login-subtitle">MomoImage · 初始配置</p>
-              <div style={{
-                background: "rgba(251, 191, 36, 0.08)",
-                border: "1px solid rgba(251, 191, 36, 0.2)",
-                borderRadius: "var(--radius-md)",
-                padding: "16px",
-                textAlign: "left",
-                fontSize: 13,
-                lineHeight: 1.8,
-              }}>
-                <p style={{ fontWeight: 600, color: "var(--color-warning)", marginBottom: 8 }}>
-                  ⚠️ 还需要一步配置
-                </p>
-                <p>请在 Cloudflare 控制台完成以下设置：</p>
-                <ol style={{ paddingLeft: 20, margin: "8px 0" }}>
-                  <li>进入你的 Worker <strong>momoimage</strong></li>
-                  <li>点击顶部的 <strong>设置</strong> 标签</li>
-                  <li>在 <strong>变量和机密</strong> 区域点击「添加」</li>
-                  <li>名称填 <code style={{ background: "var(--color-bg-surface)", padding: "1px 6px", borderRadius: 4 }}>ADMIN_PASSWORD</code></li>
-                  <li>值填入你想要的登录密码</li>
-                  <li>类型选择 <strong>机密 (Secret)</strong></li>
-                  <li>保存后重新部署</li>
-                </ol>
-                <p style={{ color: "var(--color-text-tertiary)", fontSize: 12 }}>
-                  设置完成后刷新此页面即可开始使用。
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <ToastContainer toasts={toasts} onRemove={removeToast} />
-      </ToastContext.Provider>
-    );
-  }
-
   // 未登录 → 显示登录
   if (!loggedIn) {
     return (
       <ToastContext.Provider value={{ showToast }}>
-        <LoginForm onLogin={handleLogin} />
+        <LoginForm
+          onLogin={handleLogin}
+          isDefaultPassword={systemInfo?.isDefaultPassword}
+        />
         <ToastContainer toasts={toasts} onRemove={removeToast} />
       </ToastContext.Provider>
     );

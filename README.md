@@ -81,7 +81,7 @@ graph TD
 
 ### 2. 本地配置文件修改
 
-打开项目根目录下的 [wrangler.jsonc](file:///d:/0_Projects/9.Code/codeProjects/momoimage/wrangler.jsonc) 文件，修改对应的绑定：
+打开 `cloudflare` 目录下的 `wrangler.jsonc` 文件，修改对应的资源绑定：
 
 ```jsonc
 {
@@ -105,25 +105,15 @@ graph TD
       "binding": "KV_META",
       "id": "你的KV命名空间ID" // 替换为你在 Cloudflare 创建的 KV ID
     }
-  ],
-  "vars": {
-    "DEPLOY_TARGET": "cloudflare"
-  }
+  ]
 }
 ```
 
-### 3. 配置环境变量 (Variables)
+### 3. 配置自定义管理员密码 (可选)
 
-> [!IMPORTANT]
-> 敏感信息建议在 Cloudflare 控制台 -> 你的 Worker 实例 -> **设置 (Settings)** -> **变量和机密 (Variables)** 中进行配置。
-
-系统需要或支持的变量如下：
-
-| 变量名 | 类型 | 是否必填 | 说明 |
-| :--- | :---: | :---: | :--- |
-| `ADMIN_PASSWORD` | Secret | **是** | 管理员登录密码。未设置时，系统会自动呈现初始化配置页。 |
-| `JWT_SECRET` | Secret | 否 | JWT 签名密钥（可由系统在 KV 中自动生成随机密钥，无需手动填）。 |
-| `SITE_URL` | Variable | 否 | 站点的 URL 域名（例如 `https://img.example.com`），未设置时会自动根据用户请求 URL 拼接。 |
+系统完全支持开箱即用，无缝免配置：
+*   **默认密码**：若不进行任何设置，默认管理员登录密码为 **`momoimage`**。
+*   **配置自定义密码**：如果您需要保障图床安全，建议在 Cloudflare 控制台 -> 你的 Worker 实例 -> **设置 (Settings)** -> **变量和机密 (Variables)** 中点击「添加变量」，名称填写 `ADMIN_PASSWORD`，值填入您心仪的密码，类型选择 **机密 (Secret)**，保存并重新部署即可。
 
 ### 4. 构建与部署
 

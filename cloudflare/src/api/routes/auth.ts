@@ -11,14 +11,7 @@ const auth = new Hono<{ Bindings: Env }>();
 /** 管理员登录 */
 auth.post("/login", async (c) => {
   const body = await c.req.json<{ password: string }>();
-  const adminPassword = c.env.ADMIN_PASSWORD;
-
-  if (!adminPassword) {
-    return c.json(
-      { success: false, error: "管理员密码未配置，请在 Cloudflare 控制台 → 设置 → 变量和机密 中添加 ADMIN_PASSWORD" },
-      500
-    );
-  }
+  const adminPassword = c.env.ADMIN_PASSWORD || "momoimage";
 
   if (body.password !== adminPassword) {
     return c.json({ success: false, error: "密码错误" }, 401);

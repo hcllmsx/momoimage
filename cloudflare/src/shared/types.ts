@@ -132,6 +132,6 @@ export interface SystemInfo {
   deployTarget: string;
   /** 版本 */
   version: string;
-  /** 是否需要初始配置（ADMIN_PASSWORD 未设置） */
-  needSetup?: boolean;
+  /** 是否使用的是默认登录密码 */
+  isDefaultPassword?: boolean;
 }

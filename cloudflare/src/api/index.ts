@@ -57,15 +57,15 @@ app.get("/api/info", (c) => {
   const siteUrl = getSiteUrl(c);
   const isDefaultDomain =
     siteUrl.includes(".workers.dev") || siteUrl.includes(".pages.dev");
-  const needSetup = !c.env.ADMIN_PASSWORD;
+  const isDefaultPassword = !c.env.ADMIN_PASSWORD;
   return c.json({
     success: true,
     data: {
       siteUrl,
       hasCustomDomain: !isDefaultDomain,
-      deployTarget: c.env.DEPLOY_TARGET || "cloudflare",
+      deployTarget: "cloudflare",
       version: "1.0.0",
-      needSetup,
+      isDefaultPassword,
     },
   });
 });

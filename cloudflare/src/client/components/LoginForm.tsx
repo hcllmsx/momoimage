@@ -5,7 +5,13 @@
 import { useState } from "react";
 import * as api from "../lib/api";
 
-export function LoginForm({ onLogin }: { onLogin: () => void }) {
+export function LoginForm({
+  onLogin,
+  isDefaultPassword,
+}: {
+  onLogin: () => void;
+  isDefaultPassword?: boolean;
+}) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -35,6 +41,22 @@ export function LoginForm({ onLogin }: { onLogin: () => void }) {
           <div className="login-logo">M</div>
           <h1 className="login-title">默默图床</h1>
           <p className="login-subtitle">MomoImage · 简洁高效的图片托管</p>
+
+          {isDefaultPassword && (
+            <div style={{
+              background: "var(--color-primary-subtle)",
+              border: "1px solid rgba(240, 160, 80, 0.15)",
+              borderRadius: "var(--radius-md)",
+              padding: "12px 14px",
+              fontSize: "12.5px",
+              color: "var(--color-primary)",
+              textAlign: "left",
+              marginBottom: 18,
+              lineHeight: 1.6,
+            }}>
+              💡 <strong>提示：</strong>当前系统未设置自定义密码，已启用默认登录密码：<code style={{ background: "var(--color-bg-surface)", padding: "2px 6px", borderRadius: 4, fontFamily: "monospace", fontWeight: "bold" }}>momoimage</code>。为了安全，建议部署后到 Cloudflare 控制台的「设置 → 变量和机密」中配置自定义 <code>ADMIN_PASSWORD</code>。
+            </div>
+          )}
 
           <form className="login-form" onSubmit={handleSubmit}>
             {error && <div className="login-error">{error}</div>}
