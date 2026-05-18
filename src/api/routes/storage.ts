@@ -9,10 +9,53 @@ import { StorageManager } from "../storage/manager";
 type Variables = { storageManager: StorageManager };
 const storage = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-/** 获取所有存储后端配置 */
+/** 获取所有存储后端配置（包括已用空间和文件数统计） */
 storage.get("/", async (c) => {
   const storageManager = c.get("storageManager") as StorageManager;
-  return c.json({ success: true, data: storageManager.getConfigs() });
+  const kv = c.env.KV_META;
+
+  const configs = storageManager.getConfigs();
+  const usedSizes: Record<string, number> = {};
+  const fileCounts: Record<string, number> = {};
+
+  configs.forEach(cfg => {
+    usedSizes[cfg.id] = 0;
+    fileCounts[cfg.id] = 0;
+  });
+
+  try {
+    const allIds = ((await kv.get("momoimage:image:list", "json")) ?? []) as string[];
+    const batchSize = 100;
+    for (let i = 0; i < allIds.length; i += batchSize) {
+      const batchIds = allIds.slice(i, i + batchSize);
+      const batchPromises = batchIds.map(id => kv.get(`momoimage:image:${id}`, "json"));
+      const batchResults = await Promise.all(batchPromises);
+      for (const meta of batchResults) {
+        if (meta && typeof meta === "object") {
+          const m = meta as any;
+          const sId = m.storageId || "local-r2";
+          const size = m.size || 0;
+          if (usedSizes[sId] !== undefined) {
+            usedSizes[sId] += size;
+            fileCounts[sId] += 1;
+          } else {
+            usedSizes[sId] = size;
+            fileCounts[sId] = 1;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Failed to calculate storage stats:", err);
+  }
+
+  const data = configs.map(cfg => ({
+    ...cfg,
+    usedSize: usedSizes[cfg.id] || 0,
+    fileCount: fileCounts[cfg.id] || 0
+  }));
+
+  return c.json({ success: true, data });
 });
 
 /** 添加存储后端 */

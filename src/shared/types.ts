@@ -64,6 +64,10 @@ export interface StorageConfig {
     token: string;
     storeId?: string;
   };
+  /** 已用容量大小（字节，后端计算返回） */
+  usedSize?: number;
+  /** 已存文件数量（后端计算返回） */
+  fileCount?: number;
 }
 
 /** API Token */

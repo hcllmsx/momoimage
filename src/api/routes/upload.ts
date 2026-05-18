@@ -66,9 +66,20 @@ upload.post("/", async (c) => {
   // 获取指定的存储后端，或使用默认
   const storageId = c.req.query("storage");
   const folderId = (c.req.query("folderId") || body["folderId"]) as string | undefined;
-  const adapter = storageId
-    ? storageManager.getAdapter(storageId)
-    : storageManager.getDefault();
+
+  let finalStorageId = storageId;
+  if (!finalStorageId) {
+    const configs = storageManager.getConfigs();
+    const defaultConfig = configs.find((c) => c.isDefault && c.enabled);
+    if (defaultConfig) {
+      finalStorageId = defaultConfig.id;
+    } else {
+      const first = configs.find((c) => c.enabled);
+      finalStorageId = first ? first.id : "local-r2";
+    }
+  }
+
+  const adapter = storageManager.getAdapter(finalStorageId);
 
   if (!adapter) {
     return c.json(
@@ -108,7 +119,7 @@ upload.post("/", async (c) => {
       mimeType: file.type,
       size: file.size,
       uploadedAt: new Date().toISOString(),
-      storageId: storageId || "local-r2",
+      storageId: finalStorageId,
       url: result.url,
       folderId: folderId || undefined,
     };

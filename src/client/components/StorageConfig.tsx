@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react";
 import type { StorageConfig as StorageConfigType, StorageType } from "@shared/types";
 import * as api from "../lib/api";
-import { getStorageTypeName } from "../lib/utils";
+import { getStorageTypeName, formatFileSize } from "../lib/utils";
 import { useToastContext } from "../App";
 
 export function StorageConfig() {
@@ -118,7 +118,14 @@ export function StorageConfig() {
                       {config.name}
                       {config.isDefault && <span className="storage-item__badge" style={{ marginLeft: 8 }}>默认</span>}
                     </div>
-                    <div className="storage-item__type">{getStorageTypeName(config.type)}</div>
+                    <div className="storage-item__type">
+                      {getStorageTypeName(config.type)}
+                      {config.usedSize !== undefined && (
+                        <span style={{ marginLeft: 12, opacity: 0.6, fontSize: "11px" }}>
+                          📊 已存容量: {formatFileSize(config.usedSize)} ({config.fileCount} 张图片)
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="storage-item__actions">
                     <button className="btn btn--ghost btn--sm" onClick={() => handleTest(config.id)}>测试</button>

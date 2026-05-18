@@ -3,7 +3,7 @@
 // ============================================
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { UploadResult, Folder } from "@shared/types";
+import type { UploadResult, Folder, StorageConfig as StorageConfigType } from "@shared/types";
 import * as api from "../lib/api";
 import { formatFileSize } from "../lib/utils";
 import { useToastContext } from "../App";
@@ -29,10 +29,24 @@ export function UploadZone({
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string>("");
+  const [storages, setStorages] = useState<StorageConfigType[]>([]);
+  const [selectedStorageId, setSelectedStorageId] = useState<string>("");
 
-  // 获取全部文件夹以供选择
+  // 获取全部文件夹和已启用存储列表
   useEffect(() => {
     api.getFolders().then(setFolders).catch(console.error);
+    
+    api.getStorageConfigs().then((configs) => {
+      const enabledStorages = configs.filter((c) => c.enabled);
+      setStorages(enabledStorages);
+      
+      const defaultStorage = enabledStorages.find((c) => c.isDefault);
+      if (defaultStorage) {
+        setSelectedStorageId(defaultStorage.id);
+      } else if (enabledStorages.length > 0) {
+        setSelectedStorageId(enabledStorages[0].id);
+      }
+    }).catch(console.error);
   }, []);
 
   const handleFolderChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -99,7 +113,7 @@ export function UploadZone({
       );
 
       try {
-        const result = await api.uploadImage(item.file, undefined, selectedFolderId || undefined);
+        const result = await api.uploadImage(item.file, selectedStorageId || undefined, selectedFolderId || undefined);
         results.push(result);
         setUploads((prev) =>
           prev.map((u) =>
@@ -120,7 +134,7 @@ export function UploadZone({
     if (results.length > 0) {
       onUploadSuccess(results);
     }
-  }, [uploads, onUploadSuccess, showToast, selectedFolderId]);
+  }, [uploads, onUploadSuccess, showToast, selectedFolderId, selectedStorageId]);
 
   const handleRemoveItem = useCallback((id: string) => {
     setUploads((prev) => prev.filter((u) => u.id !== id));
@@ -158,44 +172,78 @@ export function UploadZone({
 
   return (
     <div onPaste={handlePaste}>
-      {/* 文件夹分类选择框 */}
-      <div className="upload-folder-select" style={{
+      {/* 文件夹分类与存储后端选择区域 */}
+      <div className="upload-options" style={{
         display: "flex",
         alignItems: "center",
+        justifyContent: "space-between",
         gap: 12,
         marginBottom: 16,
         background: "var(--color-bg-surface)",
         padding: "12px 16px",
         borderRadius: "var(--radius-md)",
         border: "1px solid var(--color-border)",
+        flexWrap: "wrap",
       }}>
-        <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-secondary)" }}>
-          📂 上传至分类文件夹：
-        </span>
-        <select
-          value={selectedFolderId}
-          onChange={handleFolderChange}
-          className="select"
-          style={{
-            padding: "6px 12px",
-            borderRadius: "var(--radius-sm)",
-            border: "1px solid var(--color-border)",
-            background: "var(--color-bg-body)",
-            color: "var(--color-text)",
-            fontSize: 14,
-            outline: "none",
-            cursor: "pointer",
-            minWidth: 160,
-          }}
-        >
-          <option value="">根目录 (无分类)</option>
-          {folders.map((f) => (
-            <option key={f.id} value={f.id}>{f.name}</option>
-          ))}
-          <option value="__create_new__" style={{ color: "var(--color-primary)", fontWeight: "bold" }}>
-            + 新建文件夹...
-          </option>
-        </select>
+        {/* 左侧：文件夹分类选择框 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-secondary)" }}>
+            📂 上传至分类文件夹：
+          </span>
+          <select
+            value={selectedFolderId}
+            onChange={handleFolderChange}
+            className="select"
+            style={{
+              padding: "6px 12px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--color-border)",
+              background: "var(--color-bg-body)",
+              color: "var(--color-text)",
+              fontSize: 14,
+              outline: "none",
+              cursor: "pointer",
+              minWidth: 160,
+            }}
+          >
+            <option value="">根目录 (无分类)</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+            <option value="__create_new__" style={{ color: "var(--color-primary)", fontWeight: "bold" }}>
+              + 新建文件夹...
+            </option>
+          </select>
+        </div>
+
+        {/* 右侧：存储后端选择框 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-secondary)" }}>
+            💾 存储至后端：
+          </span>
+          <select
+            value={selectedStorageId}
+            onChange={(e) => setSelectedStorageId(e.target.value)}
+            className="select"
+            style={{
+              padding: "6px 12px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--color-border)",
+              background: "var(--color-bg-body)",
+              color: "var(--color-text)",
+              fontSize: 14,
+              outline: "none",
+              cursor: "pointer",
+              minWidth: 180,
+            }}
+          >
+            {storages.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}{s.isDefault ? " (默认)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div
