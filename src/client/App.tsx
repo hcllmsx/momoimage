@@ -128,6 +128,19 @@ export default function App() {
     }
   };
 
+  const handleDeleteMultipleImages = async (ids: string[]) => {
+    try {
+      await Promise.all(ids.map((id) => api.deleteImage(id)));
+      setImages((prev) => prev.filter((img) => !ids.includes(img.id)));
+      setTotalImages((prev) => prev - ids.length);
+      setSystemTotalImages((prev) => prev - ids.length);
+      showToast(`成功批量删除 ${ids.length} 张图片`, "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "批量删除失败", "error");
+      loadImages(1, currentFolderId);
+    }
+  };
+
   const handleCreateFolder = async (name: string) => {
     const newFolder = await api.createFolder(name);
     setFolders((prev) => [...prev, newFolder]);
@@ -153,6 +166,27 @@ export default function App() {
           img.id === imageId ? { ...img, folderId: folderId || undefined } : img
         )
       );
+    }
+  };
+
+  const handleMoveMultipleImages = async (ids: string[], folderId: string | null) => {
+    try {
+      await Promise.all(ids.map((id) => api.moveImage(id, folderId || undefined)));
+      if (currentFolderId !== folderId) {
+        setImages((prev) => prev.filter((img) => !ids.includes(img.id)));
+        setTotalImages((prev) => prev - ids.length);
+      } else {
+        setImages((prev) =>
+          prev.map((img) =>
+            ids.includes(img.id) ? { ...img, folderId: folderId || undefined } : img
+          )
+        );
+      }
+      showToast(`成功将 ${ids.length} 张图片移至目标分类`, "success");
+      loadFolders(); // 刷新分类统计数
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "批量移动失败", "error");
+      loadImages(1, currentFolderId);
     }
   };
 
@@ -288,6 +322,7 @@ export default function App() {
               hasMore={images.length < totalImages}
               onLoadMore={() => loadImages(page + 1)}
               onDelete={handleDeleteImage}
+              onDeleteMultiple={handleDeleteMultipleImages}
               onCopyLink={handleCopyLink}
               folders={folders}
               currentFolderId={currentFolderId}
@@ -295,6 +330,7 @@ export default function App() {
               onCreateFolder={handleCreateFolder}
               onDeleteFolder={handleDeleteFolder}
               onMoveImage={handleMoveImage}
+              onMoveMultiple={handleMoveMultipleImages}
             />
           )}
 
