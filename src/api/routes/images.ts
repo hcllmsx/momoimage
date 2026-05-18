@@ -79,12 +79,17 @@ images.get("/", async (c) => {
   const end = Math.min(start + pageSize, total);
   const pageIds = allIds.slice(start, end);
 
+  const siteUrl = c.env.SITE_URL || new URL(c.req.url).origin;
+  const baseUrl = siteUrl.replace(/\/$/, "");
+
   // 批量获取图片元数据
   const items: ImageMeta[] = [];
   for (const id of pageIds) {
-    const meta = await kv.get(`momoimage:image:${id}`, "json");
+    const meta = (await kv.get(`momoimage:image:${id}`, "json")) as ImageMeta | null;
     if (meta) {
-      items.push(meta as ImageMeta);
+      // 统一动态改写为当前系统的自定义直链域名，确保前端预览、详情卡片与分享链接 100% 对齐一致！
+      meta.url = `${baseUrl}/i/${meta.key}`;
+      items.push(meta);
     }
   }
 
@@ -104,10 +109,13 @@ images.get("/:id", async (c) => {
   const id = c.req.param("id");
   const kv = c.env.KV_META;
 
-  const meta = await kv.get(`momoimage:image:${id}`, "json");
+  const meta = (await kv.get(`momoimage:image:${id}`, "json")) as ImageMeta | null;
   if (!meta) {
     return c.json({ success: false, error: "图片不存在" }, 404);
   }
+
+  const siteUrl = c.env.SITE_URL || new URL(c.req.url).origin;
+  meta.url = `${siteUrl.replace(/\/$/, "")}/i/${meta.key}`;
 
   return c.json({ success: true, data: meta });
 });
