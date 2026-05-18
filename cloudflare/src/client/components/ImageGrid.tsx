@@ -158,18 +158,7 @@ export function ImageGrid({
   return (
     <div>
       {/* 文件夹头部与面包屑导航 */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginBottom: 20,
-        background: "var(--color-bg-surface)",
-        padding: "12px 16px",
-        borderRadius: "var(--radius-md)",
-        border: "1px solid var(--color-border)",
-        flexWrap: "wrap",
-        gap: 12,
-      }}>
+      <div className="folder-header">
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 500 }}>
           <span
             style={{ cursor: "pointer", color: currentFolderId ? "var(--color-primary)" : "var(--color-text)" }}
@@ -264,27 +253,7 @@ export function ImageGrid({
               <div
                 key={folder.id}
                 onClick={() => onFolderChange(folder.id)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "14px 16px",
-                  background: "var(--color-bg-surface)",
-                  borderRadius: "var(--radius-md)",
-                  border: "1px solid var(--color-border)",
-                  cursor: "pointer",
-                  transition: "transform 0.2s ease, border-color 0.2s ease",
-                  userSelect: "none",
-                }}
-                className="folder-card-hover"
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "var(--color-primary-light)";
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "var(--color-border)";
-                  e.currentTarget.style.transform = "none";
-                }}
+                className="folder-card"
               >
                 <span style={{ fontSize: 24 }}>📁</span>
                 <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
