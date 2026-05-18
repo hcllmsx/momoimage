@@ -1,6 +1,6 @@
 # 默默图床 (MomoImage) 📸
 
-默默图床是一个专为 Cloudflare 平台（同时支持 Vercel）设计的高性能、现代化全栈图片托管系统。它采用极速轻量的 Fullstack（全栈）架构，提供开箱即用的高性能图片代理、多存储后端动态管理以及完备的安全认证。
+默默图床是一个专为 Cloudflare 平台设计的高性能、现代化全栈图片托管系统。它采用极速轻量的 Fullstack（全栈）架构，提供开箱即用的高性能图片代理、多存储后端动态管理以及完备的安全认证。
 
 > [!TIP]
 > 默默图床通过将前端 SPA 静态资源与 Hono 后端 API 融为一体，并借助 Cloudflare R2 与 KV 提供了近乎零延迟、无限容量且极其廉价的图床方案。
@@ -27,7 +27,7 @@ graph TD
     
     R2Adapter -->|数据流| CF_R2[(Cloudflare R2 存储桶)]
     S3Adapter -->|AWS/MinIO/腾讯云/阿里云| S3_Cloud[(S3 兼容存储)]
-    VercelBlobAdapter -->|Vercel 平台| VC_Blob[(Vercel Blob)]
+    VercelBlobAdapter -->|Vercel 存储| VC_Blob[(Vercel Blob)]
 ```
 
 ---
@@ -42,7 +42,7 @@ graph TD
 默默图床通过统一的 `StorageAdapter` 接口，支持多种主流对象存储，可在后台动态增加、删除、测试连接和一键设置默认值：
 * **本地 R2 存储 (`r2-binding`)**：直接绑定本账号下的 Cloudflare R2 存储桶，速度最快、零延迟、零额外认证，是默认首选。
 * **S3 兼容存储 (`s3`)**：支持通过 S3 协议访问任何 S3 兼容的对象存储（例如外部 Cloudflare R2 账号、AWS S3、MinIO 等），支持配置自定义 CDN 加速域名 (`publicUrl`)。
-* **Vercel Blob 存储 (`vercel-blob`)**：针对 Vercel 部署环境深度优化，使用纯 HTTP REST 方式交互（不引入官方 SDK），包体积更轻量。
+* **Vercel Blob 存储 (`vercel-blob`)**：支持使用纯 HTTP REST 方式与 Vercel Blob 交互（不引入官方 SDK），提供轻量、快速的高性价比第三方存储选择。
 
 ### 3. 🛡️ 双重认证安全体系
 * **管理后台 JWT 认证**：后台登录生成 JWT 会话 Token，支持设置 `ADMIN_PASSWORD` 与 `JWT_SECRET`。若没有配置 `JWT_SECRET`，系统将自动生成强随机密钥并安全持久化到 Cloudflare KV。
