@@ -184,6 +184,16 @@ export async function addStorage(
   return res.data!;
 }
 
+export async function updateStorage(
+  id: string,
+  config: StorageConfig
+): Promise<void> {
+  await request(`/storage/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(config),
+  });
+}
+
 export async function deleteStorage(id: string): Promise<void> {
   await request(`/storage/${id}`, { method: "DELETE" });
 }

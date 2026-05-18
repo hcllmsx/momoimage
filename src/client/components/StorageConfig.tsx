@@ -11,6 +11,7 @@ import { useToastContext } from "../App";
 export function StorageConfig() {
   const [configs, setConfigs] = useState<StorageConfigType[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<StorageConfigType | null>(null);
   const [loading, setLoading] = useState(true);
   const { showToast } = useToastContext();
 
@@ -49,8 +50,19 @@ export function StorageConfig() {
     }
   };
 
-  const handleAdded = () => {
+  const handleSetDefault = async (config: StorageConfigType) => {
+    try {
+      await api.updateStorage(config.id, { ...config, isDefault: true });
+      showToast(`已成功将 "${config.name}" 设为默认存储`, "success");
+      loadConfigs();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "设置默认失败", "error");
+    }
+  };
+
+  const handleSaved = () => {
     setShowAddForm(false);
+    setEditingConfig(null);
     loadConfigs();
   };
 
@@ -71,12 +83,29 @@ export function StorageConfig() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card__header">
           <span className="card__title">存储后端</span>
-          <button className="btn btn--primary btn--sm" onClick={() => setShowAddForm(!showAddForm)}>
+          <button
+            className="btn btn--primary btn--sm"
+            onClick={() => {
+              if (showAddForm) {
+                setShowAddForm(false);
+                setEditingConfig(null);
+              } else {
+                setShowAddForm(true);
+                setEditingConfig(null);
+              }
+            }}
+          >
             {showAddForm ? "取消" : "➕ 添加存储"}
           </button>
         </div>
         <div className="card__body">
-          {showAddForm && <AddStorageForm onAdded={handleAdded} />}
+          {showAddForm && (
+            <StorageForm
+              key={editingConfig?.id || "new"}
+              config={editingConfig}
+              onSaved={handleSaved}
+            />
+          )}
 
           <div className="storage-list">
             {configs.map((config) => {
@@ -93,8 +122,22 @@ export function StorageConfig() {
                   </div>
                   <div className="storage-item__actions">
                     <button className="btn btn--ghost btn--sm" onClick={() => handleTest(config.id)}>测试</button>
+                    {!config.isDefault && (
+                      <button className="btn btn--ghost btn--sm" onClick={() => handleSetDefault(config)}>设为默认</button>
+                    )}
                     {config.id !== "local-r2" && (
-                      <button className="btn btn--danger btn--sm" onClick={() => handleDelete(config.id)}>删除</button>
+                      <>
+                        <button
+                          className="btn btn--ghost btn--sm"
+                          onClick={() => {
+                            setEditingConfig(config);
+                            setShowAddForm(true);
+                          }}
+                        >
+                          编辑
+                        </button>
+                        <button className="btn btn--danger btn--sm" onClick={() => handleDelete(config.id)}>删除</button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -118,66 +161,231 @@ export function StorageConfig() {
   );
 }
 
-// ========= 添加存储表单 =========
-function AddStorageForm({ onAdded }: { onAdded: () => void }) {
-  const [type, setType] = useState<StorageType>("s3");
-  const [name, setName] = useState("");
-  const [endpoint, setEndpoint] = useState("");
-  const [region, setRegion] = useState("auto");
-  const [accessKeyId, setAccessKeyId] = useState("");
-  const [secretAccessKey, setSecretAccessKey] = useState("");
-  const [bucket, setBucket] = useState("");
-  const [publicUrl, setPublicUrl] = useState("");
-  const [blobToken, setBlobToken] = useState("");
+// ========= 存储配置表单 (添加/编辑) =========
+interface StorageFormProps {
+  config?: StorageConfigType | null;
+  onSaved: () => void;
+}
+
+function StorageForm({ config, onSaved }: StorageFormProps) {
+  const isEdit = !!config;
+
+  // 根据 Endpoint 特征自动判断供应商类别（是否是外部 R2）
+  const getInitialProvider = (): "r2-external" | "s3-general" | "vercel-blob" => {
+    if (!config) return "r2-external";
+    if (config.type === "vercel-blob") return "vercel-blob";
+    if (config.type === "s3") {
+      const ep = config.s3Config?.endpoint || "";
+      if (ep.includes("r2.cloudflarestorage.com")) return "r2-external";
+      return "s3-general";
+    }
+    return "s3-general";
+  };
+
+  const [provider, setProvider] = useState<"r2-external" | "s3-general" | "vercel-blob">(getInitialProvider());
+  const [name, setName] = useState(config?.name || "");
   const [loading, setLoading] = useState(false);
   const { showToast } = useToastContext();
 
+  // R2 外部专有字段 (将 endpoint 和 bucket 拼装回完整的 R2 S3 API 链接)
+  const getInitialR2Url = () => {
+    if (config?.type === "s3" && config.s3Config) {
+      const ep = config.s3Config.endpoint || "";
+      const bk = config.s3Config.bucket || "";
+      if (ep.includes("r2.cloudflarestorage.com")) {
+        return `${ep}/${bk}`;
+      }
+    }
+    return "";
+  };
+  const [r2S3ApiUrl, setR2S3ApiUrl] = useState(getInitialR2Url());
+
+  // 基础 S3 字段
+  const [endpoint, setEndpoint] = useState(config?.s3Config?.endpoint || "");
+  const [region, setRegion] = useState(config?.s3Config?.region || "auto");
+  const [bucket, setBucket] = useState(config?.s3Config?.bucket || "");
+  const [accessKeyId, setAccessKeyId] = useState(config?.s3Config?.accessKeyId || "");
+  const [secretAccessKey, setSecretAccessKey] = useState(config?.s3Config?.secretAccessKey || "");
+  const [publicUrl, setPublicUrl] = useState(config?.s3Config?.publicUrl || "");
+
+  // Vercel Blob 字段
+  const [blobToken, setBlobToken] = useState(config?.vercelBlobConfig?.token || "");
+
+  // 解析 R2 完整链接的工具函数
+  const parseR2Url = (url: string) => {
+    try {
+      const trimmed = url.trim();
+      const parsed = new URL(trimmed);
+      const bucketName = parsed.pathname.replace(/^\//, "").split("/")[0] || "";
+      const endpointUrl = `${parsed.protocol}//${parsed.host}`;
+      return { bucket: bucketName, endpoint: endpointUrl };
+    } catch {
+      return { bucket: "", endpoint: "" };
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) { showToast("请输入名称", "error"); return; }
+    if (!name.trim()) { showToast("请输入显示名称", "error"); return; }
     setLoading(true);
 
     try {
-      const config: StorageConfigType = {
-        id: "",
+      // S3 协议和 R2 外部接口在后端类型都归属为 "s3"
+      const type: StorageType = provider === "vercel-blob" ? "vercel-blob" : "s3";
+
+      const submitConfig: StorageConfigType = {
+        id: config?.id || "",
         name: name.trim(),
         type,
-        isDefault: false,
-        enabled: true,
+        isDefault: config?.isDefault || false,
+        enabled: config?.enabled ?? true,
       };
 
       if (type === "s3") {
-        config.s3Config = { endpoint, region, accessKeyId, secretAccessKey, bucket, publicUrl };
+        let finalEndpoint = endpoint.trim();
+        let finalBucket = bucket.trim();
+        let finalRegion = region.trim() || "auto";
+
+        if (provider === "r2-external") {
+          if (!r2S3ApiUrl.trim()) {
+            showToast("请输入 R2 S3 API 链接", "error");
+            setLoading(false);
+            return;
+          }
+          const parsed = parseR2Url(r2S3ApiUrl);
+          if (!parsed.bucket || !parsed.endpoint) {
+            showToast("无法解析 R2 链接，请输入正确的 R2 S3 API 地址", "error");
+            setLoading(false);
+            return;
+          }
+          finalEndpoint = parsed.endpoint;
+          finalBucket = parsed.bucket;
+          finalRegion = "auto";
+        } else {
+          if (!finalEndpoint) { showToast("请输入 Endpoint 地址", "error"); setLoading(false); return; }
+          if (!finalBucket) { showToast("请输入 Bucket 名称", "error"); setLoading(false); return; }
+        }
+
+        if (!accessKeyId.trim()) { showToast("请输入 Access Key ID", "error"); setLoading(false); return; }
+        if (!secretAccessKey.trim()) { showToast("请输入 Secret Access Key", "error"); setLoading(false); return; }
+
+        submitConfig.s3Config = {
+          endpoint: finalEndpoint,
+          region: finalRegion,
+          accessKeyId: accessKeyId.trim(),
+          secretAccessKey: secretAccessKey.trim(),
+          bucket: finalBucket,
+          publicUrl: publicUrl.trim() || undefined,
+        };
       } else if (type === "vercel-blob") {
-        config.vercelBlobConfig = { token: blobToken };
+        if (!blobToken.trim()) { showToast("请输入 Vercel Blob Token", "error"); setLoading(false); return; }
+        submitConfig.vercelBlobConfig = {
+          token: blobToken.trim(),
+        };
       }
 
-      await api.addStorage(config);
-      showToast("存储添加成功", "success");
-      onAdded();
+      if (isEdit) {
+        await api.updateStorage(config!.id, submitConfig);
+        showToast("存储配置修改成功", "success");
+      } else {
+        await api.addStorage(submitConfig);
+        showToast("存储后端添加成功", "success");
+      }
+      onSaved();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "添加失败", "error");
+      showToast(err instanceof Error ? err.message : "保存失败", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  const renderAwsCredentialsHelp = () => (
+    <div style={{
+      background: "rgba(245, 158, 11, 0.08)",
+      borderLeft: "4px solid #f59e0b",
+      padding: "10px 14px",
+      borderRadius: "0 6px 6px 0",
+      fontSize: "12px",
+      color: "var(--color-text-secondary)",
+      lineHeight: "1.5",
+      margin: "8px 0"
+    }}>
+      <span style={{ fontWeight: "bold", color: "#d97706", display: "block", marginBottom: 4 }}>
+        ⚠️ 警惕：此处需要填入 R2 S3 凭证，而非普通的 Cloudflare API 令牌！
+      </span>
+      以 <code style={{ background: "rgba(0,0,0,0.05)", padding: "2px 4px", borderRadius: 4 }}>cfat_</code> 或 <code style={{ background: "rgba(0,0,0,0.05)", padding: "2px 4px", borderRadius: 4 }}>cfut_</code> 开头的 Cloudflare 主 API 令牌<strong>无法</strong>直接用作 S3 的签名密钥！
+      <br />
+      <strong>正确获取路径：</strong>
+      打开另一个账户的 R2 控制台主页，在右侧边栏点击 <strong>“管理 R2 API 令牌 (Manage R2 API Tokens)”</strong> 并创建令牌（权限选择“编辑”并勾选特定的存储桶）。
+      <strong>令牌生成后，请向下滑动页面</strong>，在最底部的 <strong>“S3 API 凭证 (S3 API Credentials)”</strong> 中看到的 <strong>Access Key ID</strong> 与 <strong>Secret Access Key</strong> 才是此表单真正需要的凭证！
+    </div>
+  );
+
   return (
     <form onSubmit={handleSubmit} style={{ marginBottom: 20, padding: 16, background: "var(--color-bg-surface)", borderRadius: "var(--radius-md)" }}>
       <div style={{ display: "grid", gap: 12 }}>
         <div>
-          <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>存储类型</label>
-          <select className="input" value={type} onChange={(e) => setType(e.target.value as StorageType)}>
-            <option value="s3">S3 兼容存储（R2 外部账号 / AWS S3）</option>
+          <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>接入供应商 / 协议</label>
+          <select className="input" value={provider} onChange={(e) => setProvider(e.target.value as any)} disabled={isEdit}>
+            <option value="r2-external">Cloudflare R2（外部账号 S3 接入）</option>
+            <option value="s3-general">AWS S3 / 其他 S3 兼容存储</option>
             <option value="vercel-blob">Vercel Blob</option>
           </select>
         </div>
         <div>
           <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>显示名称</label>
-          <input className="input" placeholder="如：我的 R2 存储" value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="input" placeholder="如：外部 R2 备份桶" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
 
-        {type === "s3" && (
+        {provider === "r2-external" && (
+          <>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>R2 S3 API 链接（直接从 CF 后台粘贴）</label>
+              <input
+                className="input"
+                placeholder="如：https://bbc8b9c5cc750d0aa6f44e95a9eade11.r2.cloudflarestorage.com/momoimage"
+                value={r2S3ApiUrl}
+                onChange={(e) => setR2S3ApiUrl(e.target.value)}
+              />
+              <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
+                💡 直接粘贴 Cloudflare 桶设置中展示的完整 <strong>S3 API</strong> 直链，系统会自动拆分出 Endpoint 和 Bucket，省心省力！
+              </div>
+            </div>
+            {renderAwsCredentialsHelp()}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>Access Key ID</label>
+                <input
+                  className="input"
+                  placeholder={isEdit ? "留空或保持未更改" : "请填写 S3 凭证中的 Access Key ID"}
+                  value={accessKeyId}
+                  onChange={(e) => setAccessKeyId(e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>Secret Access Key</label>
+                <input
+                  className="input"
+                  type="password"
+                  placeholder={isEdit ? "留空或保持未更改" : "请填写 S3 凭证中的 Secret Access Key"}
+                  value={secretAccessKey}
+                  onChange={(e) => setSecretAccessKey(e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>公开 URL 前缀（可选）</label>
+              <input
+                className="input"
+                placeholder="如：https://img2.yourdomain.com (留空则默认通过图床本域代理路由进行强缓存访问)"
+                value={publicUrl}
+                onChange={(e) => setPublicUrl(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+
+        {provider === "s3-general" && (
           <>
             <div>
               <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>Endpoint</label>
@@ -190,7 +398,7 @@ function AddStorageForm({ onAdded }: { onAdded: () => void }) {
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>Secret Access Key</label>
-                <input className="input" type="password" value={secretAccessKey} onChange={(e) => setSecretAccessKey(e.target.value)} />
+                <input className="input" type="password" placeholder={isEdit ? "******" : ""} value={secretAccessKey} onChange={(e) => setSecretAccessKey(e.target.value)} />
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -210,15 +418,15 @@ function AddStorageForm({ onAdded }: { onAdded: () => void }) {
           </>
         )}
 
-        {type === "vercel-blob" && (
+        {provider === "vercel-blob" && (
           <div>
             <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>BLOB_READ_WRITE_TOKEN</label>
-            <input className="input" type="password" value={blobToken} onChange={(e) => setBlobToken(e.target.value)} />
+            <input className="input" type="password" placeholder={isEdit ? "******" : ""} value={blobToken} onChange={(e) => setBlobToken(e.target.value)} />
           </div>
         )}
 
         <button className="btn btn--primary" type="submit" disabled={loading}>
-          {loading ? "添加中..." : "添加存储"}
+          {loading ? "保存中..." : (isEdit ? "保存修改" : "添加存储")}
         </button>
       </div>
     </form>

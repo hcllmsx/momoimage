@@ -122,6 +122,20 @@ export class StorageManager {
       throw new Error(`Storage with id "${id}" not found`);
     }
 
+    // 如果客户端上传了 ***hidden*** 掩码，则还原为实际密钥
+    if (updates.s3Config && updates.s3Config.secretAccessKey === "***hidden***") {
+      const oldSecret = this.configs[index].s3Config?.secretAccessKey;
+      if (oldSecret) {
+        updates.s3Config.secretAccessKey = oldSecret;
+      }
+    }
+    if (updates.vercelBlobConfig && updates.vercelBlobConfig.token === "***hidden***") {
+      const oldToken = this.configs[index].vercelBlobConfig?.token;
+      if (oldToken) {
+        updates.vercelBlobConfig.token = oldToken;
+      }
+    }
+
     // 不允许修改 local-r2 的类型
     if (id === "local-r2" && updates.type && updates.type !== "r2-binding") {
       throw new Error("Cannot change type of local R2 storage");
