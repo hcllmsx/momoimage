@@ -36,13 +36,25 @@ export class StorageManager {
 
   /** 初始化：加载已保存的存储配置并创建适配器实例 */
   async initialize(): Promise<void> {
-    // 1. 如果有 R2 Binding，自动注册本账号 R2
+    let hasDefaultExternal = false;
+    let savedConfigs: StorageConfig[] = [];
+
+    // 1. 先从 KV 读取外部配置以确定是否有默认配置
+    if (this.kv) {
+      const data = await this.kv.get(STORAGE_CONFIG_KEY, "json");
+      if (data && Array.isArray(data)) {
+        savedConfigs = data as StorageConfig[];
+        hasDefaultExternal = savedConfigs.some((c) => c.isDefault && c.enabled);
+      }
+    }
+
+    // 2. 如果有 R2 Binding，自动注册本账号 R2
     if (this.r2Bucket) {
       const localR2Config: StorageConfig = {
         id: "local-r2",
         name: "本地 R2 存储",
         type: "r2-binding",
-        isDefault: true,
+        isDefault: !hasDefaultExternal, // 如果外部已经有默认存储，则本地存储不作为默认
         enabled: true,
       };
       this.configs.push(localR2Config);
@@ -52,22 +64,17 @@ export class StorageManager {
       );
     }
 
-    // 2. 从 KV 加载已保存的外部存储配置
-    if (this.kv) {
-      const savedConfigs = await this.kv.get(STORAGE_CONFIG_KEY, "json");
-      if (savedConfigs && Array.isArray(savedConfigs)) {
-        for (const config of savedConfigs as StorageConfig[]) {
-          try {
-            await this.createAdapter(config);
-            this.configs.push(config);
-          } catch (err) {
-            console.error(`Failed to create adapter for ${config.name}:`, err);
-          }
-        }
+    // 3. 加载外部存储适配器并保存到 configs
+    for (const config of savedConfigs) {
+      try {
+        await this.createAdapter(config);
+        this.configs.push(config);
+      } catch (err) {
+        console.error(`Failed to create adapter for ${config.name}:`, err);
       }
     }
 
-    // 3. 如果没有任何存储后端，且没有 R2 Binding，则无默认存储
+    // 4. 如果没有任何存储后端，且没有 R2 Binding，则无默认存储
     if (this.configs.length === 0) {
       console.warn("No storage backends configured");
     }
