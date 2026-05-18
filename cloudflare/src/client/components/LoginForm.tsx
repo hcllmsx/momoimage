@@ -38,7 +38,9 @@ export function LoginForm({
     <div className="login-container">
       <div className="login-card card">
         <div className="card__body" style={{ padding: 32 }}>
-          <div className="login-logo">M</div>
+          <div className="login-logo">
+            <img src="/favicon.svg" alt="MomoImage" style={{ width: 36, height: 36, display: "block" }} />
+          </div>
           <h1 className="login-title">默默图床</h1>
           <p className="login-subtitle">MomoImage · 简洁高效的图片托管</p>
 

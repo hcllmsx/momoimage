@@ -35,6 +35,13 @@ export function isLoggedIn(): boolean {
   return !!getToken();
 }
 
+let onUnauthorizedCallback: (() => void) | null = null;
+
+/** 注册全局未授权/Token过期回调 */
+export function onUnauthorized(callback: () => void): void {
+  onUnauthorizedCallback = callback;
+}
+
 /** 通用请求方法 */
 async function request<T>(
   path: string,
@@ -58,6 +65,13 @@ async function request<T>(
     ...options,
     headers,
   });
+
+  if (response.status === 401) {
+    clearToken();
+    if (onUnauthorizedCallback) {
+      onUnauthorizedCallback();
+    }
+  }
 
   const data = (await response.json()) as ApiResponse<T>;
 
@@ -138,6 +152,12 @@ export async function uploadImage(
 
     xhr.onload = () => {
       try {
+        if (xhr.status === 401) {
+          clearToken();
+          if (onUnauthorizedCallback) {
+            onUnauthorizedCallback();
+          }
+        }
         const data = JSON.parse(xhr.responseText) as ApiResponse<UploadResult>;
         if (xhr.status >= 200 && xhr.status < 300 && data.success) {
           resolve(data.data!);

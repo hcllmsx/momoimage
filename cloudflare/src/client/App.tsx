@@ -134,6 +134,13 @@ export default function App() {
     localStorage.removeItem("momoimage:activeTab");
   };
 
+  // 监听全局 API 未授权错误（如 JWT 无效/过期），自动清理状态并登出
+  useEffect(() => {
+    api.onUnauthorized(() => {
+      handleLogout();
+    });
+  }, []);
+
   const handleUploadSuccess = (results: UploadResult[]) => {
     if (results.length === 1) {
       setLinkDialogData(results[0]);
