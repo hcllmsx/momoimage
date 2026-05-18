@@ -68,19 +68,54 @@ export class VercelBlobAdapter implements StorageAdapter {
     };
   }
 
+  private async listRaw(options?: ListOptions): Promise<{
+    blobs: Array<{
+      pathname: string;
+      size: number;
+      uploadedAt: string;
+      url: string;
+    }>;
+    cursor?: string;
+    hasMore: boolean;
+  }> {
+    const params = new URLSearchParams();
+    if (options?.prefix) params.set("prefix", options.prefix);
+    if (options?.cursor) params.set("cursor", options.cursor);
+    if (options?.limit) params.set("limit", String(options.limit));
+
+    const response = await fetch(
+      `https://blob.vercel-storage.com?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          "x-api-version": "7",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Vercel Blob list failed: ${await response.text()}`);
+    }
+
+    return response.json();
+  }
+
+  private async resolvePublicUrl(key: string): Promise<string | null> {
+    try {
+      const listResult = await this.listRaw({ prefix: key, limit: 1 });
+      const blob = listResult.blobs.find((b) => b.pathname === key);
+      return blob ? blob.url : null;
+    } catch (err) {
+      console.error(`Failed to resolve public URL for key ${key}:`, err);
+      return null;
+    }
+  }
+
   async get(key: string): Promise<GetResult | null> {
-    // Vercel Blob 的文件通过其 URL 直接访问
-    // 我们需要先从元数据中获取实际 URL，但这里简化处理
-    const listResult = await this.list({ prefix: key, limit: 1 });
-    if (listResult.objects.length === 0) return null;
+    const url = await this.resolvePublicUrl(key);
+    if (!url) return null;
 
-    const url = `https://blob.vercel-storage.com/${key}`;
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-      },
-    });
-
+    const response = await fetch(url);
     if (!response.ok) return null;
 
     return {
@@ -91,7 +126,9 @@ export class VercelBlobAdapter implements StorageAdapter {
   }
 
   async delete(key: string): Promise<void> {
-    const url = `https://blob.vercel-storage.com/${key}`;
+    const url = await this.resolvePublicUrl(key);
+    if (!url) return; // 图片在 Vercel 端本身就不存在，直接跳过
+
     const response = await fetch(
       "https://blob.vercel-storage.com/delete",
       {
@@ -112,36 +149,7 @@ export class VercelBlobAdapter implements StorageAdapter {
   }
 
   async list(options?: ListOptions): Promise<ListResult> {
-    const params = new URLSearchParams();
-    if (options?.prefix) params.set("prefix", options.prefix);
-    if (options?.cursor) params.set("cursor", options.cursor);
-    if (options?.limit) params.set("limit", String(options.limit));
-
-    const response = await fetch(
-      `https://blob.vercel-storage.com?${params.toString()}`,
-      {
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          "x-api-version": "7",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Vercel Blob list failed: ${await response.text()}`);
-    }
-
-    const result = (await response.json()) as {
-      blobs: Array<{
-        pathname: string;
-        size: number;
-        uploadedAt: string;
-        url: string;
-      }>;
-      cursor?: string;
-      hasMore: boolean;
-    };
-
+    const result = await this.listRaw(options);
     return {
       objects: result.blobs.map((blob) => ({
         key: blob.pathname,
