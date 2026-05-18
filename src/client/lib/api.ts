@@ -140,6 +140,13 @@ export async function deleteImage(id: string): Promise<void> {
   await request(`/images/${id}`, { method: "DELETE" });
 }
 
+export async function deleteMultipleImages(ids: string[]): Promise<void> {
+  await request("/images/batch/delete", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
 // ========= 文件夹 API =========
 
 export async function getFolders(): Promise<Folder[]> {
@@ -165,6 +172,13 @@ export async function moveImage(id: string, folderId?: string): Promise<ImageMet
     body: JSON.stringify({ folderId }),
   });
   return res.data!;
+}
+
+export async function moveMultipleImages(ids: string[], folderId?: string): Promise<void> {
+  await request("/images/batch/move", {
+    method: "POST",
+    body: JSON.stringify({ ids, folderId }),
+  });
 }
 
 // ========= 存储 API =========

@@ -145,7 +145,7 @@ export default function App() {
 
   const handleDeleteMultipleImages = async (ids: string[]) => {
     try {
-      await Promise.all(ids.map((id) => api.deleteImage(id)));
+      await api.deleteMultipleImages(ids);
       setImages((prev) => prev.filter((img) => !ids.includes(img.id)));
       setTotalImages((prev) => prev - ids.length);
       setSystemTotalImages((prev) => prev - ids.length);
@@ -186,7 +186,7 @@ export default function App() {
 
   const handleMoveMultipleImages = async (ids: string[], folderId: string | null) => {
     try {
-      await Promise.all(ids.map((id) => api.moveImage(id, folderId || undefined)));
+      await api.moveMultipleImages(ids, folderId || undefined);
       if (currentFolderId !== folderId) {
         setImages((prev) => prev.filter((img) => !ids.includes(img.id)));
         setTotalImages((prev) => prev - ids.length);
