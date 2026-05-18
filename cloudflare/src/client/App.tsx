@@ -12,6 +12,7 @@ import { ImageGrid } from "./components/ImageGrid";
 import { LinkDialog } from "./components/LinkDialog";
 import { StorageConfig } from "./components/StorageConfig";
 import { ToastContainer, useToast } from "./components/Toast";
+import { Footer } from "./components/Footer";
 
 // ========= Toast 上下文 =========
 interface ToastContextValue {
@@ -28,7 +29,9 @@ type Tab = "upload" | "images" | "storage";
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(api.isLoggedIn());
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("upload");
+  const [activeTab, setActiveTab] = useState<Tab>(
+    () => (localStorage.getItem("momoimage:activeTab") as Tab) || "upload"
+  );
   const [linkDialogData, setLinkDialogData] = useState<UploadResult | null>(null);
   const [images, setImages] = useState<ImageMeta[]>([]);
   const [totalImages, setTotalImages] = useState(0);
@@ -46,6 +49,11 @@ export default function App() {
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+
+  // 保存当前选项卡状态至 localStorage
+  useEffect(() => {
+    localStorage.setItem("momoimage:activeTab", activeTab);
+  }, [activeTab]);
 
   // 挂载主题类名
   useEffect(() => {
@@ -122,6 +130,8 @@ export default function App() {
     setImages([]);
     setFolders([]);
     setCurrentFolderId(null);
+    setActiveTab("upload");
+    localStorage.removeItem("momoimage:activeTab");
   };
 
   const handleUploadSuccess = (results: UploadResult[]) => {
@@ -235,10 +245,15 @@ export default function App() {
   if (!loggedIn) {
     return (
       <ToastContext.Provider value={{ showToast }}>
-        <LoginForm
-          onLogin={handleLogin}
-          isDefaultPassword={systemInfo?.isDefaultPassword}
-        />
+        <div className="app-layout" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <LoginForm
+              onLogin={handleLogin}
+              isDefaultPassword={systemInfo?.isDefaultPassword}
+            />
+          </div>
+          <Footer />
+        </div>
         <ToastContainer toasts={toasts} onRemove={removeToast} />
       </ToastContext.Provider>
     );
@@ -318,6 +333,8 @@ export default function App() {
           {/* 存储配置页 */}
           {activeTab === "storage" && <StorageConfig />}
         </main>
+
+        <Footer />
 
         {/* 链接弹窗 */}
         {linkDialogData && (

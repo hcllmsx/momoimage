@@ -897,3 +897,31 @@ body,
     transform: translate(-50%, 0);
   }
 }
+
+/* ---------- 极简高级页脚 ---------- */
+.app-footer {
+  text-align: center;
+  padding: 16px 24px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  background: var(--color-bg-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: auto;
+  user-select: none;
+}
+
+.app-footer a {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--transition-fast);
+}
+
+.app-footer a:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
