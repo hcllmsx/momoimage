@@ -130,26 +130,54 @@ export function UploadZone({
         )
       );
 
+      let simulatedProgress = 0;
+      let actualProgress = 0;
+
+      // 60ms 刷新率的极客拟合曲线定时器，确保视觉动效极致丝滑
+      const progressTimer = setInterval(() => {
+        if (simulatedProgress < 30) {
+          // 起步爆发段：每次递增 5% 到 9%
+          simulatedProgress += Math.floor(Math.random() * 5) + 5;
+        } else if (simulatedProgress < 90) {
+          // 中期稳步爬行段：每次递增 0.5% 到 1.5%
+          simulatedProgress += Math.random() * 1.0 + 0.5;
+        } else if (simulatedProgress < 99) {
+          // 后期云端处理阻尼段：每次极缓爬升 0.05% 到 0.15%
+          simulatedProgress += Math.random() * 0.1 + 0.05;
+        }
+
+        const displayProgress = Math.min(
+          99,
+          Math.max(Math.round(simulatedProgress), Math.round(actualProgress * 0.95))
+        );
+
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === item.id ? { ...u, progress: displayProgress } : u
+          )
+        );
+      }, 60);
+
       try {
         const result = await api.uploadImage(
           item.file,
           selectedStorageId || undefined,
           selectedFolderId || undefined,
           (percent) => {
-            setUploads((prev) =>
-              prev.map((u) =>
-                u.id === item.id ? { ...u, progress: percent } : u
-              )
-            );
+            actualProgress = percent;
           }
         );
+
+        clearInterval(progressTimer);
         results.push(result);
+
         setUploads((prev) =>
           prev.map((u) =>
             u.id === item.id ? { ...u, status: "success", progress: 100, result } : u
           )
         );
       } catch (err) {
+        clearInterval(progressTimer);
         const errorMsg = err instanceof Error ? err.message : "上传失败";
         setUploads((prev) =>
           prev.map((u) =>
@@ -161,7 +189,14 @@ export function UploadZone({
 
     setIsUploading(false);
     if (results.length > 0) {
-      onUploadSuccess(results);
+      if (results.length === 1) {
+        // 单张图片上传成功，特意延迟 250ms 弹出详情弹窗，留足时间给眼睛感受绿光充满的解压动效
+        setTimeout(() => {
+          onUploadSuccess(results);
+        }, 250);
+      } else {
+        onUploadSuccess(results);
+      }
     }
   }, [uploads, onUploadSuccess, showToast, selectedFolderId, selectedStorageId]);
 
@@ -350,7 +385,7 @@ export function UploadZone({
                         ? 0
                         : item.status === "success" || item.status === "error"
                         ? 100
-                        : Math.min(95, item.progress || 0)
+                        : item.progress || 0
                     }%`
                   }}
                 />
@@ -375,7 +410,9 @@ export function UploadZone({
                   >
                     {item.status === "pending" && "等待中"}
                     {item.status === "uploading" && (
-                      item.progress === 100 ? "处理中..." : `上传中... ${item.progress || 0}%`
+                      item.progress && item.progress >= 90
+                        ? `处理中... ${item.progress}%`
+                        : `上传中... ${item.progress || 0}%`
                     )}
                     {item.status === "success" && "✓ 完成"}
                     {item.status === "error" && `✗ ${item.error}`}
