@@ -126,6 +126,7 @@ upload.post("/", async (c) => {
 
     const kv = c.env.KV_META;
     await kv.put(`momoimage:image:${id}`, JSON.stringify(meta));
+    await kv.put(`momoimage:key:${key}`, id);
 
     // 更新图片列表索引
     await addToImageIndex(kv, id, folderId);

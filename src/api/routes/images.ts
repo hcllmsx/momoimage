@@ -95,6 +95,7 @@ images.delete("/:id", async (c) => {
 
     // 删除元数据
     await kv.delete(`momoimage:image:${id}`);
+    await kv.delete(`momoimage:key:${meta.key}`);
 
     // 从全局列表索引中移除
     const listKey = "momoimage:image:list";

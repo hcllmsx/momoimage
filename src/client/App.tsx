@@ -32,6 +32,7 @@ export default function App() {
   const [linkDialogData, setLinkDialogData] = useState<UploadResult | null>(null);
   const [images, setImages] = useState<ImageMeta[]>([]);
   const [totalImages, setTotalImages] = useState(0);
+  const [systemTotalImages, setSystemTotalImages] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [domainBannerDismissed, setDomainBannerDismissed] = useState(
@@ -41,6 +42,16 @@ export default function App() {
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+
+  // 加载系统级全部图片总数统计
+  const loadSystemStats = useCallback(async () => {
+    try {
+      const result = await api.getImages(1, 1, "all");
+      setSystemTotalImages(result.total);
+    } catch (err) {
+      console.error("Failed to load system stats:", err);
+    }
+  }, []);
 
   // 加载文件夹列表
   const loadFolders = useCallback(async () => {
@@ -55,8 +66,9 @@ export default function App() {
   useEffect(() => {
     if (loggedIn) {
       loadFolders();
+      loadSystemStats();
     }
-  }, [loggedIn, loadFolders]);
+  }, [loggedIn, loadFolders, loadSystemStats]);
 
   // 获取系统信息
   useEffect(() => {
@@ -101,6 +113,7 @@ export default function App() {
     showToast(`成功上传 ${results.length} 张图片`, "success");
     loadImages(1, currentFolderId); // 刷新列表
     loadFolders(); // 刷新分类统计数
+    setSystemTotalImages((prev) => prev + results.length);
   };
 
   const handleDeleteImage = async (id: string) => {
@@ -108,6 +121,7 @@ export default function App() {
       await api.deleteImage(id);
       setImages((prev) => prev.filter((img) => img.id !== id));
       setTotalImages((prev) => prev - 1);
+      setSystemTotalImages((prev) => prev - 1);
       showToast("图片已删除", "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "删除失败", "error");
@@ -251,7 +265,7 @@ export default function App() {
               className={`nav-tab ${activeTab === "images" ? "nav-tab--active" : ""}`}
               onClick={() => setActiveTab("images")}
             >
-              🖼️ 图库 ({totalImages})
+              🖼️ 图库 {systemTotalImages > 0 ? `(${systemTotalImages})` : ""}
             </button>
             <button
               className={`nav-tab ${activeTab === "storage" ? "nav-tab--active" : ""}`}

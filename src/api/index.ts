@@ -84,7 +84,26 @@ app.get("/i/*", async (c) => {
   });
   await manager.initialize();
 
-  const adapter = manager.getDefault();
+  const kv = c.env.KV_META;
+  let adapter = manager.getDefault();
+
+  // 尝试通过 KV 映射关系查询该图片具体存储在哪个后端
+  try {
+    const decodedKey = decodeURIComponent(key);
+    const mappedId = await kv.get(`momoimage:key:${decodedKey}`);
+    if (mappedId) {
+      const meta = (await kv.get(`momoimage:image:${mappedId}`, "json")) as any;
+      if (meta && meta.storageId) {
+        const targetAdapter = manager.getAdapter(meta.storageId);
+        if (targetAdapter) {
+          adapter = targetAdapter;
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Failed to resolve storage adapter by key mapping:", err);
+  }
+
   if (!adapter) return c.text("Storage not configured", 500);
 
   const result = await adapter.get(decodeURIComponent(key));
