@@ -65,6 +65,7 @@ upload.post("/", async (c) => {
 
   // 获取指定的存储后端，或使用默认
   const storageId = c.req.query("storage");
+  const folderId = (c.req.query("folderId") || body["folderId"]) as string | undefined;
   const adapter = storageId
     ? storageManager.getAdapter(storageId)
     : storageManager.getDefault();
@@ -109,13 +110,14 @@ upload.post("/", async (c) => {
       uploadedAt: new Date().toISOString(),
       storageId: storageId || "local-r2",
       url: result.url,
+      folderId: folderId || undefined,
     };
 
     const kv = c.env.KV_META;
     await kv.put(`momoimage:image:${id}`, JSON.stringify(meta));
 
     // 更新图片列表索引
-    await addToImageIndex(kv, id);
+    await addToImageIndex(kv, id, folderId);
 
     // 生成各种格式的链接
     const imageUrl = `${siteUrl}/i/${key}`;
@@ -189,11 +191,20 @@ function formatDatePrefix(): string {
 }
 
 /** 将图片 ID 添加到索引列表 */
-async function addToImageIndex(kv: KVNamespace, id: string): Promise<void> {
-  const listKey = "momoimage:image:list";
-  const list = ((await kv.get(listKey, "json")) ?? []) as string[];
-  list.unshift(id); // 新图片放在最前面
-  await kv.put(listKey, JSON.stringify(list));
+async function addToImageIndex(kv: KVNamespace, id: string, folderId?: string): Promise<void> {
+  // 1. 全局索引
+  const globalListKey = "momoimage:image:list";
+  const globalList = ((await kv.get(globalListKey, "json")) ?? []) as string[];
+  globalList.unshift(id);
+  await kv.put(globalListKey, JSON.stringify(globalList));
+
+  // 2. 文件夹/分类索引
+  const folderListKey = folderId 
+    ? `momoimage:folder:${folderId}:images` 
+    : "momoimage:folder:root:images";
+  const folderList = ((await kv.get(folderListKey, "json")) ?? []) as string[];
+  folderList.unshift(id);
+  await kv.put(folderListKey, JSON.stringify(folderList));
 }
 
 export default upload;

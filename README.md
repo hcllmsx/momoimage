@@ -187,9 +187,12 @@ npm run deploy
 #### 1. 上传图片
 * **请求方式**：`POST`
 * **路由**：`/api/upload`
-* **Query 参数**：`?storage=storage_id` (可选，不传则使用后台设置的默认存储后端)
+* **Query 参数**：
+  * `storage`: `storage_id` (可选，不传则使用后台默认存储)
+  * `folderId`: `folder_id` (可选，上传到指定的虚拟分类文件夹，不传或为空则上传到根目录)
 * **Body 格式**：`multipart/form-data`
   * `file`: 图片文件 (支持 JPEG, PNG, WebP, GIF, SVG 等，最大 20MB)
+  * `folderId`: `folder_id` (可选，亦可通过 Body 传递分类文件夹 ID)
 * **响应结果**：
   ```json
   {
@@ -200,6 +203,7 @@ npm run deploy
       "originalName": "pic.png",
       "size": 102400,
       "mimeType": "image/png",
+      "folderId": "folder-xxx",
       "links": {
         "url": "https://img.example.com/i/2026/05/abc123_pic.png",
         "markdown": "![pic.png](https://img.example.com/i/2026/05/abc123_pic.png)",
@@ -211,19 +215,22 @@ npm run deploy
   ```
 
 #### 2. 程序化上传脚本示例 (curl)
-你可以配合 ShareX、PicGo 或本地 Shell 脚本，一键实现终端快速上传图片：
+你可以配合 ShareX、PicGo 或本地 Shell 脚本，一键实现终端快速上传图片（亦支持携带 `folderId` 选定分类）：
 
 ```bash
 curl -X POST \
   -H "Authorization: Token your_api_token" \
   -F "file=@/path/to/your/image.png" \
+  -F "folderId=your_folder_id" \
   https://img.example.com/api/upload
 ```
 
 #### 3. 图片库管理
-* **获取图片列表 (分页)**：`GET /api/images?page=1&pageSize=20`
+* **获取图片列表 (分页)**：`GET /api/images?page=1&pageSize=20&folderId=folder_id`
+  * `folderId`: (可选) 可传入特定文件夹 ID，传入 `"root"` 或不传代表根目录，传入 `"all"` 获取全部图片。
 * **获取图片详情**：`GET /api/images/:id`
-* **物理/元数据删除**：`DELETE /api/images/:id` (自动从对应的物理存储端进行真实删除，并同步清理 KV 元数据与全局索引)
+* **移动图片分类**：`PUT /api/images/:id/move` (Body: `{ "folderId": "新的分类ID或空值" }`)
+* **物理/元数据删除**：`DELETE /api/images/:id` (自动从对应的物理存储端进行真实删除，并同步清理所有全局与文件夹 KV 索引)
 
 #### 4. 外部存储后端管理
 * **列出所有存储配置**：`GET /api/storage` (已自动对 `secretAccessKey` / `token` 等敏感参数进行掩码脱敏)
@@ -232,7 +239,12 @@ curl -X POST \
 * **删除存储配置**：`DELETE /api/storage/:id`
 * **测试连接性**：`POST /api/storage/:id/test` (通过列出一条测试文件来实时验证连接密钥和可用性)
 
-#### 5. API 开放令牌管理
+#### 5. 虚拟分类文件夹管理
+* **列出所有分类文件夹**：`GET /api/folders`
+* **创建新分类文件夹**：`POST /api/folders` (Body: `{ "name": "新文件夹名称" }`)
+* **删除分类文件夹**：`DELETE /api/folders/:id` (安全解散分类：不会删除里面的物理图片，图片将被自动转移并合并到根目录下)
+
+#### 6. API 开放令牌管理
 * **列出 API 令牌**：`GET /api/auth/tokens`
 * **创建新 API 令牌**：`POST /api/auth/token` (Body: `{ "name": "备注名" }`)
 * **注销 API 令牌**：`DELETE /api/auth/token/:id`

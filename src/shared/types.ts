@@ -24,6 +24,15 @@ export interface ImageMeta {
   storageId: string;
   /** 公开访问 URL */
   url: string;
+  /** 所属文件夹 ID */
+  folderId?: string;
+}
+
+/** 文件夹定义 */
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: string;
 }
 
 /** 存储后端类型 */

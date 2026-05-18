@@ -11,6 +11,7 @@ import authRoutes from "./routes/auth";
 import uploadRoutes from "./routes/upload";
 import imageRoutes from "./routes/images";
 import storageRoutes from "./routes/storage";
+import folderRoutes from "./routes/folders";
 
 type Variables = {
   storageManager: StorageManager;
@@ -101,10 +102,12 @@ app.route("/api/auth", authRoutes);
 app.use("/api/upload/*", authMiddleware);
 app.use("/api/images/*", authMiddleware);
 app.use("/api/storage/*", authMiddleware);
+app.use("/api/folders/*", authMiddleware);
 app.use("/api/auth/token*", authMiddleware);
 
 app.route("/api/upload", uploadRoutes);
 app.route("/api/images", imageRoutes);
+app.route("/api/folders", folderRoutes);
 app.route("/api/storage", storageRoutes);
 
 // ========= 前端静态资源回退 =========

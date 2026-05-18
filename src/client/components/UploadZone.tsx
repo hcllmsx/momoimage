@@ -2,8 +2,8 @@
 // 默默图床 — 上传区域组件
 // ============================================
 
-import { useState, useRef, useCallback } from "react";
-import type { UploadResult } from "@shared/types";
+import { useState, useRef, useCallback, useEffect } from "react";
+import type { UploadResult, Folder } from "@shared/types";
 import * as api from "../lib/api";
 import { formatFileSize } from "../lib/utils";
 import { useToastContext } from "../App";
@@ -26,6 +26,36 @@ export function UploadZone({
   const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToastContext();
+
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string>("");
+
+  // 获取全部文件夹以供选择
+  useEffect(() => {
+    api.getFolders().then(setFolders).catch(console.error);
+  }, []);
+
+  const handleFolderChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    if (value === "__create_new__") {
+      const name = prompt("请输入新文件夹的名称：");
+      if (!name || !name.trim()) {
+        setSelectedFolderId(""); // 重置为根目录
+        return;
+      }
+      try {
+        const newFolder = await api.createFolder(name.trim());
+        setFolders((prev) => [...prev, newFolder]);
+        setSelectedFolderId(newFolder.id);
+        showToast(`文件夹 "${name.trim()}" 创建成功`, "success");
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "创建失败", "error");
+        setSelectedFolderId("");
+      }
+    } else {
+      setSelectedFolderId(value);
+    }
+  };
 
   const processFiles = useCallback(
     (files: File[]) => {
@@ -69,7 +99,7 @@ export function UploadZone({
       );
 
       try {
-        const result = await api.uploadImage(item.file);
+        const result = await api.uploadImage(item.file, undefined, selectedFolderId || undefined);
         results.push(result);
         setUploads((prev) =>
           prev.map((u) =>
@@ -90,7 +120,7 @@ export function UploadZone({
     if (results.length > 0) {
       onUploadSuccess(results);
     }
-  }, [uploads, onUploadSuccess, showToast]);
+  }, [uploads, onUploadSuccess, showToast, selectedFolderId]);
 
   const handleRemoveItem = useCallback((id: string) => {
     setUploads((prev) => prev.filter((u) => u.id !== id));
@@ -128,6 +158,46 @@ export function UploadZone({
 
   return (
     <div onPaste={handlePaste}>
+      {/* 文件夹分类选择框 */}
+      <div className="upload-folder-select" style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        marginBottom: 16,
+        background: "var(--color-bg-surface)",
+        padding: "12px 16px",
+        borderRadius: "var(--radius-md)",
+        border: "1px solid var(--color-border)",
+      }}>
+        <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-secondary)" }}>
+          📂 上传至分类文件夹：
+        </span>
+        <select
+          value={selectedFolderId}
+          onChange={handleFolderChange}
+          className="select"
+          style={{
+            padding: "6px 12px",
+            borderRadius: "var(--radius-sm)",
+            border: "1px solid var(--color-border)",
+            background: "var(--color-bg-body)",
+            color: "var(--color-text)",
+            fontSize: 14,
+            outline: "none",
+            cursor: "pointer",
+            minWidth: 160,
+          }}
+        >
+          <option value="">根目录 (无分类)</option>
+          {folders.map((f) => (
+            <option key={f.id} value={f.id}>{f.name}</option>
+          ))}
+          <option value="__create_new__" style={{ color: "var(--color-primary)", fontWeight: "bold" }}>
+            + 新建文件夹...
+          </option>
+        </select>
+      </div>
+
       <div
         className={`upload-zone ${dragover ? "upload-zone--dragover" : ""}`}
         onClick={() => inputRef.current?.click()}

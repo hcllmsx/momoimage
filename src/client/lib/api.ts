@@ -10,6 +10,7 @@ import type {
   StorageConfig,
   ApiToken,
   SystemInfo,
+  Folder,
 } from "@shared/types";
 
 const API_BASE = "/api";
@@ -102,12 +103,20 @@ export async function deleteApiToken(id: string): Promise<void> {
 
 export async function uploadImage(
   file: File,
-  storageId?: string
+  storageId?: string,
+  folderId?: string
 ): Promise<UploadResult> {
   const formData = new FormData();
   formData.append("file", file);
+  if (folderId) {
+    formData.append("folderId", folderId);
+  }
 
-  const query = storageId ? `?storage=${storageId}` : "";
+  const params = new URLSearchParams();
+  if (storageId) params.set("storage", storageId);
+  if (folderId) params.set("folderId", folderId);
+  const query = params.toString() ? `?${params.toString()}` : "";
+
   const res = await request<UploadResult>(`/upload${query}`, {
     method: "POST",
     body: formData,
@@ -117,16 +126,45 @@ export async function uploadImage(
 
 export async function getImages(
   page = 1,
-  pageSize = 20
+  pageSize = 20,
+  folderId?: string
 ): Promise<PaginatedResult<ImageMeta>> {
+  const query = folderId ? `&folderId=${folderId}` : "";
   const res = await request<PaginatedResult<ImageMeta>>(
-    `/images?page=${page}&pageSize=${pageSize}`
+    `/images?page=${page}&pageSize=${pageSize}${query}`
   );
   return res.data!;
 }
 
 export async function deleteImage(id: string): Promise<void> {
   await request(`/images/${id}`, { method: "DELETE" });
+}
+
+// ========= 文件夹 API =========
+
+export async function getFolders(): Promise<Folder[]> {
+  const res = await request<Folder[]>("/folders");
+  return res.data!;
+}
+
+export async function createFolder(name: string): Promise<Folder> {
+  const res = await request<Folder>("/folders", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+  return res.data!;
+}
+
+export async function deleteFolder(id: string): Promise<void> {
+  await request(`/folders/${id}`, { method: "DELETE" });
+}
+
+export async function moveImage(id: string, folderId?: string): Promise<ImageMeta> {
+  const res = await request<ImageMeta>(`/images/${id}/move`, {
+    method: "PUT",
+    body: JSON.stringify({ folderId }),
+  });
+  return res.data!;
 }
 
 // ========= 存储 API =========

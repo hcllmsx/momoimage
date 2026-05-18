@@ -3,7 +3,7 @@
 // ============================================
 
 import { useState, useEffect, useCallback, createContext, useContext } from "react";
-import type { SystemInfo, ImageMeta, UploadResult } from "@shared/types";
+import type { SystemInfo, ImageMeta, UploadResult, Folder } from "@shared/types";
 import * as api from "./lib/api";
 import { LoginForm } from "./components/LoginForm";
 import { Header } from "./components/Header";
@@ -39,16 +39,35 @@ export default function App() {
   );
   const { toasts, showToast, removeToast } = useToast();
 
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+
+  // 加载文件夹列表
+  const loadFolders = useCallback(async () => {
+    try {
+      const list = await api.getFolders();
+      setFolders(list);
+    } catch (err) {
+      console.error("Failed to load folders:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (loggedIn) {
+      loadFolders();
+    }
+  }, [loggedIn, loadFolders]);
+
   // 获取系统信息
   useEffect(() => {
     api.getSystemInfo().then(setSystemInfo).catch(console.error);
   }, []);
 
   // 登录后加载图片
-  const loadImages = useCallback(async (p = 1) => {
+  const loadImages = useCallback(async (p = 1, folderId = currentFolderId) => {
     setLoading(true);
     try {
-      const result = await api.getImages(p, 20);
+      const result = await api.getImages(p, 20, folderId || undefined);
       setImages(p === 1 ? result.items : (prev) => [...prev, ...result.items]);
       setTotalImages(result.total);
       setPage(p);
@@ -57,13 +76,13 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, currentFolderId]);
 
   useEffect(() => {
     if (loggedIn) {
-      loadImages(1);
+      loadImages(1, currentFolderId);
     }
-  }, [loggedIn, loadImages]);
+  }, [loggedIn, currentFolderId, loadImages]);
 
   const handleLogin = () => setLoggedIn(true);
 
@@ -71,6 +90,8 @@ export default function App() {
     api.clearToken();
     setLoggedIn(false);
     setImages([]);
+    setFolders([]);
+    setCurrentFolderId(null);
   };
 
   const handleUploadSuccess = (results: UploadResult[]) => {
@@ -78,7 +99,8 @@ export default function App() {
       setLinkDialogData(results[0]);
     }
     showToast(`成功上传 ${results.length} 张图片`, "success");
-    loadImages(1); // 刷新列表
+    loadImages(1, currentFolderId); // 刷新列表
+    loadFolders(); // 刷新分类统计数
   };
 
   const handleDeleteImage = async (id: string) => {
@@ -89,6 +111,34 @@ export default function App() {
       showToast("图片已删除", "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "删除失败", "error");
+    }
+  };
+
+  const handleCreateFolder = async (name: string) => {
+    const newFolder = await api.createFolder(name);
+    setFolders((prev) => [...prev, newFolder]);
+    showToast(`分类 "${name}" 创建成功`, "success");
+  };
+
+  const handleDeleteFolder = async (id: string) => {
+    await api.deleteFolder(id);
+    setFolders((prev) => prev.filter((f) => f.id !== id));
+    setCurrentFolderId(null); // 安全返回根目录
+    showToast("分类已解散，图片已放回根目录", "success");
+  };
+
+  const handleMoveImage = async (imageId: string, folderId: string | null) => {
+    await api.moveImage(imageId, folderId || undefined);
+    // 从当前列表视图中安全过滤/调整
+    if (currentFolderId !== folderId) {
+      setImages((prev) => prev.filter((img) => img.id !== imageId));
+      setTotalImages((prev) => prev - 1);
+    } else {
+      setImages((prev) =>
+        prev.map((img) =>
+          img.id === imageId ? { ...img, folderId: folderId || undefined } : img
+        )
+      );
     }
   };
 
@@ -225,6 +275,12 @@ export default function App() {
               onLoadMore={() => loadImages(page + 1)}
               onDelete={handleDeleteImage}
               onCopyLink={handleCopyLink}
+              folders={folders}
+              currentFolderId={currentFolderId}
+              onFolderChange={setCurrentFolderId}
+              onCreateFolder={handleCreateFolder}
+              onDeleteFolder={handleDeleteFolder}
+              onMoveImage={handleMoveImage}
             />
           )}
 
