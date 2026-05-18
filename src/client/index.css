@@ -86,6 +86,9 @@
 }
 
 /* ---------- 白天模式下的额外微调 ---------- */
+.light-theme .app-header {
+  background: rgba(243, 244, 246, 0.85);
+}
 .light-theme ::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.15);
 }

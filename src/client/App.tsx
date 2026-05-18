@@ -41,7 +41,7 @@ export default function App() {
   const { toasts, showToast, removeToast } = useToast();
 
   const [theme, setTheme] = useState<"light" | "dark">(
-    () => (localStorage.getItem("momoimage:theme") as "light" | "dark") || "dark"
+    () => (localStorage.getItem("momoimage:theme") as "light" | "dark") || "light"
   );
 
   const [folders, setFolders] = useState<Folder[]>([]);

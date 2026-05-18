@@ -26,11 +26,13 @@ export function Header({
           onClick={onToggleTheme}
           style={{
             fontSize: 14,
-            padding: "6px 12px",
+            width: 32,
+            height: 32,
+            padding: 0,
             border: "1px solid var(--color-border)",
             display: "flex",
             alignItems: "center",
-            gap: 6,
+            justifyContent: "center",
             cursor: "pointer",
             background: "var(--color-bg-input)",
             color: "var(--color-text-secondary)",
@@ -38,7 +40,7 @@ export function Header({
           }}
           title={theme === "light" ? "切换为暗夜模式" : "切换为白天模式"}
         >
-          {theme === "light" ? "🌙 暗夜" : "☀️ 白天"}
+          {theme === "light" ? "🌙" : "☀️"}
         </button>
         <button className="btn btn--ghost btn--sm" onClick={onLogout}>
           退出登录
