@@ -2,6 +2,9 @@
 // 默默图床 — Hono 后端入口
 // ============================================
 
+import { DOMParser } from "@xmldom/xmldom";
+(globalThis as any).DOMParser = DOMParser;
+
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
