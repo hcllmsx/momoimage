@@ -85,7 +85,24 @@ export function UploadZone({
         return;
       }
 
-      const items: UploadItem[] = imageFiles.map((file) => ({
+      const MAX_SIZE = 20 * 1024 * 1024; // 20MB
+      const tooLargeFiles = imageFiles.filter((f) => f.size > MAX_SIZE);
+      const validFiles = imageFiles.filter((f) => f.size <= MAX_SIZE);
+
+      if (tooLargeFiles.length > 0) {
+        showToast(
+          tooLargeFiles.length === 1
+            ? `图片 "${tooLargeFiles[0].name}" 超过 20MB 限制，已被跳过`
+            : `有 ${tooLargeFiles.length} 张图片超过 20MB 限制，已被自动跳过`,
+          "error"
+        );
+      }
+
+      if (validFiles.length === 0) {
+        return;
+      }
+
+      const items: UploadItem[] = validFiles.map((file) => ({
         id: Math.random().toString(36).slice(2),
         file,
         status: "pending" as const,
@@ -333,7 +350,7 @@ export function UploadZone({
                         ? 0
                         : item.status === "success" || item.status === "error"
                         ? 100
-                        : item.progress || 0
+                        : Math.min(95, item.progress || 0)
                     }%`
                   }}
                 />
@@ -357,7 +374,9 @@ export function UploadZone({
                     }`}
                   >
                     {item.status === "pending" && "等待中"}
-                    {item.status === "uploading" && `上传中... ${item.progress || 0}%`}
+                    {item.status === "uploading" && (
+                      item.progress === 100 ? "处理中..." : `上传中... ${item.progress || 0}%`
+                    )}
                     {item.status === "success" && "✓ 完成"}
                     {item.status === "error" && `✗ ${item.error}`}
                   </span>
