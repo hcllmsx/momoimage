@@ -903,7 +903,7 @@ body,
   text-align: center;
   padding: 16px 24px;
   border-top: 1px solid var(--color-border);
-  color: var(--color-text-tertiary);
+  color: #aba7a9;
   font-size: 12px;
   background: var(--color-bg-base);
   display: flex;
@@ -915,7 +915,7 @@ body,
 }
 
 .app-footer a {
-  color: var(--color-text-secondary);
+  color: #aba7a9;
   text-decoration: none;
   font-weight: 500;
   transition: color var(--transition-fast);
