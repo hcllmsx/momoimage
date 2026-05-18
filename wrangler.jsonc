@@ -1,0 +1,43 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "momoimage",
+  "main": "./src/api/index.ts",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": "./dist"
+  },
+  // R2 存储桶绑定 — 在 Cloudflare 控制台创建 R2 Bucket 后填入 bucket_name
+  "r2_buckets": [
+    {
+      "binding": "R2_BUCKET",
+      "bucket_name": "momoimage"
+    }
+  ],
+  // KV 命名空间绑定 — 在 Cloudflare 控制台创建 KV 后填入 id
+  "kv_namespaces": [
+    {
+      "binding": "KV_META",
+      "id": "d3813fea00ad4c7394be8c44e2ac7b7e" // 部署前在 Cloudflare 控制台创建 KV 命名空间并替换此值
+    }
+  ],
+  // 环境变量 — 敏感信息通过 Cloudflare 控制台 > Settings > Variables 设置
+  // 需要设置的变量:
+  //   ADMIN_PASSWORD - 管理员登录密码
+  //   JWT_SECRET     - JWT 签名密钥（随便一串字符）
+  //   SITE_URL       - 站点 URL（如 https://img.example.com）
+  "vars": {
+    "DEPLOY_TARGET": "cloudflare"
+  },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": true
+    }
+  }
+}
