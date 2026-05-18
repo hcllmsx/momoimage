@@ -20,7 +20,7 @@
   "kv_namespaces": [
     {
       "binding": "KV_META",
-      "id": "d3813fea00ad4c7394be8c44e2ac7b7e" // 部署前在 Cloudflare 控制台创建 KV 命名空间并替换此值
+      "id": "68c5306cf3b94cf08c766f6f6178169e" // 部署前在 Cloudflare 控制台创建 KV 命名空间并替换此值
     }
   ],
   // 环境变量 — 敏感信息通过 Cloudflare 控制台 > Settings > Variables 设置
