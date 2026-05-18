@@ -57,8 +57,8 @@ storage.delete("/:id", async (c) => {
 storage.post("/:id/test", async (c) => {
   const id = c.req.param("id");
   const storageManager = c.get("storageManager") as StorageManager;
-  const ok = await storageManager.testStorage(id);
-  return c.json({ success: true, data: { connected: ok, message: ok ? "连接成功" : "连接失败" } });
+  const result = await storageManager.testStorage(id);
+  return c.json({ success: true, data: result });
 });
 
 export default storage;

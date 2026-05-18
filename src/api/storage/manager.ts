@@ -170,16 +170,20 @@ export class StorageManager {
   }
 
   /** 测试存储后端连接 */
-  async testStorage(id: string): Promise<boolean> {
+  async testStorage(id: string): Promise<{ connected: boolean; message: string }> {
     const adapter = this.adapters.get(id);
-    if (!adapter) return false;
+    if (!adapter) {
+      return { connected: false, message: `未找到存储 ID 为 "${id}" 的适配器` };
+    }
 
     try {
       // 尝试列出文件来测试连接
       await adapter.list({ limit: 1 });
-      return true;
-    } catch {
-      return false;
+      return { connected: true, message: "连接成功" };
+    } catch (err) {
+      console.error(`Failed to test connection for storage "${id}":`, err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      return { connected: false, message: errMsg };
     }
   }
 
