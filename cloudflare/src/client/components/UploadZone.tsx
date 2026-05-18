@@ -109,7 +109,7 @@ export function UploadZone({
     for (const item of pendingItems) {
       setUploads((prev) =>
         prev.map((u) =>
-          u.id === item.id ? { ...u, status: "uploading" } : u
+          u.id === item.id ? { ...u, status: "uploading", progress: 0 } : u
         )
       );
 
