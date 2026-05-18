@@ -93,6 +93,9 @@ export default function App() {
   // 登录后加载图片
   const loadImages = useCallback(async (p = 1, folderId = currentFolderId) => {
     setLoading(true);
+    if (p === 1) {
+      setImages([]); // 切换分类或加载第一页时，立即清空旧数据，防止残影与视觉闪烁！
+    }
     try {
       const result = await api.getImages(p, 20, folderId || undefined);
       setImages(p === 1 ? result.items : (prev) => [...prev, ...result.items]);
