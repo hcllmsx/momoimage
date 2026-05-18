@@ -104,24 +104,57 @@ export async function deleteApiToken(id: string): Promise<void> {
 export async function uploadImage(
   file: File,
   storageId?: string,
-  folderId?: string
+  folderId?: string,
+  onProgress?: (percent: number) => void
 ): Promise<UploadResult> {
-  const formData = new FormData();
-  formData.append("file", file);
-  if (folderId) {
-    formData.append("folderId", folderId);
-  }
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (folderId) {
+      formData.append("folderId", folderId);
+    }
 
-  const params = new URLSearchParams();
-  if (storageId) params.set("storage", storageId);
-  if (folderId) params.set("folderId", folderId);
-  const query = params.toString() ? `?${params.toString()}` : "";
+    const params = new URLSearchParams();
+    if (storageId) params.set("storage", storageId);
+    if (folderId) params.set("folderId", folderId);
+    const query = params.toString() ? `?${params.toString()}` : "";
 
-  const res = await request<UploadResult>(`/upload${query}`, {
-    method: "POST",
-    body: formData,
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE}/upload${query}`);
+
+    const token = getToken();
+    if (token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          onProgress(percent);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText) as ApiResponse<UploadResult>;
+        if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+          resolve(data.data!);
+        } else {
+          reject(new Error(data.error || `请求失败 (${xhr.status})`));
+        }
+      } catch (err) {
+        reject(new Error(`解析响应失败 (${xhr.status})`));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error("网络请求失败"));
+    };
+
+    xhr.send(formData);
   });
-  return res.data!;
 }
 
 export async function getImages(

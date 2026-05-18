@@ -12,6 +12,7 @@ interface UploadItem {
   id: string;
   file: File;
   status: "pending" | "uploading" | "success" | "error";
+  progress?: number;
   result?: UploadResult;
   error?: string;
 }
@@ -113,11 +114,22 @@ export function UploadZone({
       );
 
       try {
-        const result = await api.uploadImage(item.file, selectedStorageId || undefined, selectedFolderId || undefined);
+        const result = await api.uploadImage(
+          item.file,
+          selectedStorageId || undefined,
+          selectedFolderId || undefined,
+          (percent) => {
+            setUploads((prev) =>
+              prev.map((u) =>
+                u.id === item.id ? { ...u, progress: percent } : u
+              )
+            );
+          }
+        );
         results.push(result);
         setUploads((prev) =>
           prev.map((u) =>
-            u.id === item.id ? { ...u, status: "success", result } : u
+            u.id === item.id ? { ...u, status: "success", progress: 100, result } : u
           )
         );
       } catch (err) {
@@ -276,46 +288,85 @@ export function UploadZone({
       {/* 上传进度列表 */}
       {uploads.length > 0 && (
         <div className="upload-progress">
-          {uploads.slice(0, 10).map((item) => (
-            <div key={item.id} className="upload-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span className="upload-item__name">
-                  {item.file.name}
-                </span>
-                <span style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>
-                  {formatFileSize(item.file.size)}
-                </span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span
-                  className={`upload-item__status ${
-                    item.status === "success"
-                      ? "upload-item__status--success"
-                      : item.status === "error"
-                      ? "upload-item__status--error"
-                      : ""
-                  }`}
-                >
-                  {item.status === "pending" && "等待中"}
-                  {item.status === "uploading" && "上传中..."}
-                  {item.status === "success" && "✓ 完成"}
-                  {item.status === "error" && `✗ ${item.error}`}
-                </span>
-                {item.status === "pending" && !isUploading && (
-                  <button
-                    className="btn btn--ghost btn--sm"
-                    style={{ padding: "2px 6px", minWidth: "auto", border: "none", marginLeft: 4 }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveItem(item.id);
-                    }}
+          {uploads.slice(0, 10).map((item) => {
+            let bgStyle: React.CSSProperties = {};
+            if (item.status === "uploading") {
+              const pct = item.progress || 0;
+              bgStyle = {
+                background: `linear-gradient(to right, var(--color-primary-subtle) ${pct}%, var(--color-bg-surface) ${pct}%)`,
+                transition: "background 0.08s ease, border-color var(--transition-fast)",
+                borderColor: "var(--color-primary-hover)"
+              };
+            } else if (item.status === "success") {
+              bgStyle = {
+                background: `linear-gradient(to right, rgba(52, 211, 153, 0.08) 100%, var(--color-bg-surface) 0%)`,
+                transition: "background var(--transition-normal), border-color var(--transition-normal)",
+                borderColor: "rgba(52, 211, 153, 0.24)"
+              };
+            } else if (item.status === "error") {
+              bgStyle = {
+                background: `linear-gradient(to right, rgba(248, 113, 113, 0.08) 100%, var(--color-bg-surface) 0%)`,
+                transition: "background var(--transition-normal), border-color var(--transition-normal)",
+                borderColor: "rgba(248, 113, 113, 0.24)"
+              };
+            } else {
+              bgStyle = {
+                background: "var(--color-bg-surface)",
+                transition: "background var(--transition-normal), border-color var(--transition-normal)",
+                borderColor: "var(--color-border)"
+              };
+            }
+
+            return (
+              <div
+                key={item.id}
+                className="upload-item"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  ...bgStyle,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span className="upload-item__name">
+                    {item.file.name}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>
+                    {formatFileSize(item.file.size)}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span
+                    className={`upload-item__status ${
+                      item.status === "success"
+                        ? "upload-item__status--success"
+                        : item.status === "error"
+                        ? "upload-item__status--error"
+                        : ""
+                    }`}
                   >
-                    ✕
-                  </button>
-                )}
+                    {item.status === "pending" && "等待中"}
+                    {item.status === "uploading" && `上传中... ${item.progress || 0}%`}
+                    {item.status === "success" && "✓ 完成"}
+                    {item.status === "error" && `✗ ${item.error}`}
+                  </span>
+                  {item.status === "pending" && !isUploading && (
+                    <button
+                      className="btn btn--ghost btn--sm"
+                      style={{ padding: "2px 6px", minWidth: "auto", border: "none", marginLeft: 4 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveItem(item.id);
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           
           <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
             {uploads.some((u) => u.status === "pending") && (

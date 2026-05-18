@@ -473,6 +473,7 @@ code {
   gap: 12px;
   padding: 10px 14px;
   background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-size: 13px;
 }
