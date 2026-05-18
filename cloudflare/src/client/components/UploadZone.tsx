@@ -289,31 +289,26 @@ export function UploadZone({
       {uploads.length > 0 && (
         <div className="upload-progress">
           {uploads.slice(0, 10).map((item) => {
-            let bgStyle: React.CSSProperties = {};
+            let borderStyle: React.CSSProperties = {};
             if (item.status === "uploading") {
-              const pct = item.progress || 0;
-              bgStyle = {
-                background: `linear-gradient(to right, var(--color-primary-subtle) ${pct}%, var(--color-bg-surface) ${pct}%)`,
-                transition: "background 0.08s ease, border-color var(--transition-fast)",
-                borderColor: "var(--color-primary-hover)"
+              borderStyle = {
+                borderColor: "var(--color-primary-hover)",
+                transition: "border-color var(--transition-fast)"
               };
             } else if (item.status === "success") {
-              bgStyle = {
-                background: `linear-gradient(to right, rgba(52, 211, 153, 0.08) 100%, var(--color-bg-surface) 0%)`,
-                transition: "background var(--transition-normal), border-color var(--transition-normal)",
-                borderColor: "rgba(52, 211, 153, 0.24)"
+              borderStyle = {
+                borderColor: "rgba(52, 211, 153, 0.24)",
+                transition: "border-color var(--transition-normal)"
               };
             } else if (item.status === "error") {
-              bgStyle = {
-                background: `linear-gradient(to right, rgba(248, 113, 113, 0.08) 100%, var(--color-bg-surface) 0%)`,
-                transition: "background var(--transition-normal), border-color var(--transition-normal)",
-                borderColor: "rgba(248, 113, 113, 0.24)"
+              borderStyle = {
+                borderColor: "rgba(248, 113, 113, 0.24)",
+                transition: "border-color var(--transition-normal)"
               };
             } else {
-              bgStyle = {
-                background: "var(--color-bg-surface)",
-                transition: "background var(--transition-normal), border-color var(--transition-normal)",
-                borderColor: "var(--color-border)"
+              borderStyle = {
+                borderColor: "var(--color-border)",
+                transition: "border-color var(--transition-normal)"
               };
             }
 
@@ -321,13 +316,28 @@ export function UploadZone({
               <div
                 key={item.id}
                 className="upload-item"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  ...bgStyle,
-                }}
+                style={borderStyle}
               >
+                {/* 绝对定位的平滑硬件加速进度背景层 */}
+                <div
+                  className={`upload-item__progress ${
+                    item.status === "success"
+                      ? "upload-item__progress--success"
+                      : item.status === "error"
+                      ? "upload-item__progress--error"
+                      : ""
+                  }`}
+                  style={{
+                    width: `${
+                      item.status === "pending"
+                        ? 0
+                        : item.status === "success" || item.status === "error"
+                        ? 100
+                        : item.progress || 0
+                    }%`
+                  }}
+                />
+
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <span className="upload-item__name">
                     {item.file.name}
