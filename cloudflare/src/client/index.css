@@ -119,6 +119,24 @@ body {
   line-height: 1.6;
 }
 
+/* ---------- 页面主题平滑且协调的过渡效果 ---------- */
+body,
+.app-header,
+.card,
+.upload-zone,
+.btn,
+.input,
+.nav-tab,
+.image-card,
+.storage-item,
+.modal,
+.link-item__value {
+  transition: background-color var(--transition-fast),
+              border-color var(--transition-fast),
+              color var(--transition-fast),
+              box-shadow var(--transition-fast);
+}
+
 #root {
   min-height: 100vh;
   display: flex;
@@ -392,7 +410,7 @@ body {
   padding: 48px 24px;
   text-align: center;
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition: transform var(--transition-normal), border-color var(--transition-fast), background-color var(--transition-fast);
   background: var(--color-bg-elevated);
   position: relative;
 }
@@ -479,7 +497,7 @@ body {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
-  transition: all var(--transition-normal);
+  transition: transform var(--transition-normal), border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .image-card:hover {
