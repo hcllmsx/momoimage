@@ -40,6 +40,7 @@ export function ImageGrid({
 }) {
   const { showToast } = useToastContext();
   const [movingImageId, setMovingImageId] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<ImageMeta | null>(null);
 
   // 批量操作相关的状态
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
@@ -294,6 +295,8 @@ export function ImageGrid({
               onClick={() => {
                 if (isMultiSelectMode) {
                   handleToggleSelect(image.id);
+                } else {
+                  onCopyLink(image);
                 }
               }}
               style={{
@@ -346,9 +349,12 @@ export function ImageGrid({
                   <div className="image-card__actions" style={{ gap: 6 }}>
                     <button
                       className="btn btn--ghost btn--sm"
-                      title="图片详情"
+                      title="图片细节"
                       style={{ minWidth: 32, padding: 0 }}
-                      onClick={() => onCopyLink(image)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLightboxImage(image);
+                      }}
                     >
                       📋
                     </button>
@@ -362,7 +368,10 @@ export function ImageGrid({
                     </button>
                     <button
                       className="btn btn--ghost btn--sm"
-                      onClick={() => handleQuickCopy(image)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleQuickCopy(image);
+                      }}
                       title="快速复制 URL"
                       style={{ minWidth: 32, padding: 0 }}
                     >
@@ -370,7 +379,8 @@ export function ImageGrid({
                     </button>
                     <button
                       className="btn btn--ghost btn--sm btn--delete"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         if (confirm("确定要删除这张图片吗？")) {
                           onDelete(image.id);
                         }
@@ -598,6 +608,102 @@ export function ImageGrid({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 极简精致灯箱 (Lightbox) 效果，展示原图 */}
+      {lightboxImage && (
+        <div
+          onClick={() => setLightboxImage(null)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(243, 244, 246, 0.95)",
+            backdropFilter: "blur(20px)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            cursor: "zoom-out",
+            animation: "fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
+        >
+          <style>{`
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes scaleIn {
+              from { transform: scale(0.95); opacity: 0; }
+              to { transform: scale(1); opacity: 1; }
+            }
+          `}</style>
+          
+          {/* 灯箱头部信息栏 */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute",
+              top: 20,
+              left: 20,
+              right: 20,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "8px 16px",
+              background: "rgba(255, 255, 255, 0.8)",
+              backdropFilter: "blur(10px)",
+              borderRadius: "var(--radius-md)",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+              border: "1px solid var(--color-border)",
+              cursor: "default",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{ fontWeight: 600, fontSize: 14, color: "var(--color-text)" }}>
+                {lightboxImage.originalName}
+              </span>
+              <span style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginTop: 2 }}>
+                {formatFileSize(lightboxImage.size)} · {lightboxImage.mimeType}
+              </span>
+            </div>
+            <button
+              onClick={() => setLightboxImage(null)}
+              style={{
+                background: "none",
+                border: "none",
+                fontSize: 18,
+                cursor: "pointer",
+                padding: 4,
+                color: "var(--color-text-secondary)",
+                transition: "color 0.2s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-text)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--color-text-secondary)")}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* 原图容器 */}
+          <img
+            src={lightboxImage.url}
+            alt={lightboxImage.originalName}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "90%",
+              maxHeight: "85%",
+              objectFit: "contain",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.15)",
+              cursor: "default",
+              animation: "scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+            }}
+          />
         </div>
       )}
     </div>

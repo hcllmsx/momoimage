@@ -112,6 +112,7 @@ export interface PaginatedResult<T> {
 export interface UploadResult {
   id: string;
   url: string;
+  thumbnailUrl?: string;
   originalName: string;
   size: number;
   mimeType: string;

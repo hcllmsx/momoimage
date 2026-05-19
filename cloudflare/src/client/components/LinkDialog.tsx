@@ -31,7 +31,7 @@ export function LinkDialog({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
-          <h3 className="modal__title">图片链接</h3>
+          <h3 className="modal__title">图片详情</h3>
           <button className="modal__close" onClick={onClose}>
             ✕
           </button>
@@ -51,7 +51,7 @@ export function LinkDialog({
             }}
           >
             <img
-              src={data.url}
+              src={data.thumbnailUrl || data.url}
               alt={data.originalName}
               style={{
                 maxWidth: "100%",

@@ -160,6 +160,7 @@ upload.post("/", async (c) => {
     const uploadResult: UploadResult = {
       id,
       url: imageUrl,
+      thumbnailUrl: hasThumbnail ? `${siteUrl}/i/${thumbnailKey}` : undefined,
       originalName: file.name,
       size: file.size,
       mimeType: file.type,

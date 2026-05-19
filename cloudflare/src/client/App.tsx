@@ -221,6 +221,7 @@ export default function App() {
     setLinkDialogData({
       id: image.id,
       url: imageUrl,
+      thumbnailUrl: image.thumbnailUrl,
       originalName: image.originalName,
       size: image.size,
       mimeType: image.mimeType,
