@@ -38,7 +38,7 @@ export interface Folder {
 }
 
 /** 存储后端类型 */
-export type StorageType = "r2-binding" | "s3" | "vercel-blob";
+export type StorageType = "r2-binding" | "s3" | "vercel-blob" | "oracle";
 
 /** 存储后端配置 */
 export interface StorageConfig {
@@ -65,6 +65,15 @@ export interface StorageConfig {
   vercelBlobConfig?: {
     token: string;
     storeId?: string;
+  };
+  /** 甲骨文云 OCI 配置（type 为 oracle 时使用） */
+  oracleConfig?: {
+    namespace: string;
+    region: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    bucket: string;
+    publicUrl?: string;
   };
   /** 已用容量大小（字节，后端计算返回） */
   usedSize?: number;

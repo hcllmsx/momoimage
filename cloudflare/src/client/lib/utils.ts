@@ -47,6 +47,7 @@ export function getStorageTypeName(type: string): string {
     "r2-binding": "Cloudflare R2",
     s3: "S3 兼容存储",
     "vercel-blob": "Vercel Blob",
+    oracle: "甲骨文云 OCI 对象存储",
   };
   return map[type] || type;
 }

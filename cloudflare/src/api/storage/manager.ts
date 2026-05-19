@@ -142,6 +142,12 @@ export class StorageManager {
         updates.vercelBlobConfig.token = oldToken;
       }
     }
+    if (updates.oracleConfig && updates.oracleConfig.secretAccessKey === "***hidden***") {
+      const oldSecret = this.configs[index].oracleConfig?.secretAccessKey;
+      if (oldSecret) {
+        updates.oracleConfig.secretAccessKey = oldSecret;
+      }
+    }
 
     // 不允许修改 local-r2 的类型
     if (id === "local-r2" && updates.type && updates.type !== "r2-binding") {
@@ -223,6 +229,28 @@ export class StorageManager {
         break;
       }
 
+      case "oracle": {
+        if (!config.oracleConfig) {
+          throw new Error("Oracle config is required for Oracle storage type");
+        }
+        const oci = config.oracleConfig;
+        // 根据名称空间与租户区域，自动拼接生成甲骨文云专属的 S3 兼容 Endpoint 服务终点
+        const endpoint = `https://${oci.namespace}.compat.objectstorage.${oci.region}.oraclecloud.com`;
+        const { S3Adapter } = await import("./s3");
+        adapter = new S3Adapter(
+          {
+            endpoint,
+            region: oci.region,
+            accessKeyId: oci.accessKeyId,
+            secretAccessKey: oci.secretAccessKey,
+            bucket: oci.bucket,
+            publicUrl: oci.publicUrl,
+          },
+          this.siteUrl
+        );
+        break;
+      }
+
       default:
         throw new Error(`Unknown storage type: ${config.type}`);
     }
@@ -250,6 +278,12 @@ export class StorageManager {
       sanitized.vercelBlobConfig = {
         ...sanitized.vercelBlobConfig,
         token: "***hidden***",
+      };
+    }
+    if (sanitized.oracleConfig) {
+      sanitized.oracleConfig = {
+        ...sanitized.oracleConfig,
+        secretAccessKey: "***hidden***",
       };
     }
     return sanitized;

@@ -71,6 +71,7 @@ export function StorageConfig() {
       case "r2-binding": return { cls: "storage-item__icon--r2", emoji: "☁️" };
       case "s3": return { cls: "storage-item__icon--s3", emoji: "📦" };
       case "vercel-blob": return { cls: "storage-item__icon--blob", emoji: "▲" };
+      case "oracle": return { cls: "storage-item__icon--s3", emoji: "🍊" };
     }
   };
 
@@ -177,10 +178,11 @@ interface StorageFormProps {
 function StorageForm({ config, onSaved }: StorageFormProps) {
   const isEdit = !!config;
 
-  // 根据 Endpoint 特征自动判断供应商类别（是否是外部 R2）
-  const getInitialProvider = (): "r2-external" | "s3-general" | "vercel-blob" => {
+  // 根据 Endpoint 特征自动判断供应商类别（是否是外部 R2 或甲骨文云）
+  const getInitialProvider = (): "r2-external" | "s3-general" | "vercel-blob" | "oracle" => {
     if (!config) return "r2-external";
     if (config.type === "vercel-blob") return "vercel-blob";
+    if (config.type === "oracle") return "oracle";
     if (config.type === "s3") {
       const ep = config.s3Config?.endpoint || "";
       if (ep.includes("r2.cloudflarestorage.com")) return "r2-external";
@@ -189,7 +191,7 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
     return "s3-general";
   };
 
-  const [provider, setProvider] = useState<"r2-external" | "s3-general" | "vercel-blob">(getInitialProvider());
+  const [provider, setProvider] = useState<"r2-external" | "s3-general" | "vercel-blob" | "oracle">(getInitialProvider());
   const [name, setName] = useState(config?.name || "");
   const [loading, setLoading] = useState(false);
   const { showToast } = useToastContext();
@@ -207,13 +209,16 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
   };
   const [r2S3ApiUrl, setR2S3ApiUrl] = useState(getInitialR2Url());
 
+  // 甲骨文云专有字段
+  const [namespace, setNamespace] = useState(config?.oracleConfig?.namespace || "");
+
   // 基础 S3 字段
   const [endpoint, setEndpoint] = useState(config?.s3Config?.endpoint || "");
-  const [region, setRegion] = useState(config?.s3Config?.region || "auto");
-  const [bucket, setBucket] = useState(config?.s3Config?.bucket || "");
-  const [accessKeyId, setAccessKeyId] = useState(config?.s3Config?.accessKeyId || "");
-  const [secretAccessKey, setSecretAccessKey] = useState(config?.s3Config?.secretAccessKey || "");
-  const [publicUrl, setPublicUrl] = useState(config?.s3Config?.publicUrl || "");
+  const [region, setRegion] = useState(config?.oracleConfig?.region || config?.s3Config?.region || "auto");
+  const [bucket, setBucket] = useState(config?.oracleConfig?.bucket || config?.s3Config?.bucket || "");
+  const [accessKeyId, setAccessKeyId] = useState(config?.oracleConfig?.accessKeyId || config?.s3Config?.accessKeyId || "");
+  const [secretAccessKey, setSecretAccessKey] = useState(config?.oracleConfig?.secretAccessKey || config?.s3Config?.secretAccessKey || "");
+  const [publicUrl, setPublicUrl] = useState(config?.oracleConfig?.publicUrl || config?.s3Config?.publicUrl || "");
 
   // Vercel Blob 字段
   const [blobToken, setBlobToken] = useState(config?.vercelBlobConfig?.token || "");
@@ -237,8 +242,10 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
     setLoading(true);
 
     try {
-      // S3 协议和 R2 外部接口在后端类型都归属为 "s3"
-      const type: StorageType = provider === "vercel-blob" ? "vercel-blob" : "s3";
+      // 确定提交的底层类型：s3, vercel-blob 或 oracle
+      let type: StorageType = "s3";
+      if (provider === "vercel-blob") type = "vercel-blob";
+      else if (provider === "oracle") type = "oracle";
 
       const submitConfig: StorageConfigType = {
         id: config?.id || "",
@@ -282,6 +289,21 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
           accessKeyId: accessKeyId.trim(),
           secretAccessKey: secretAccessKey.trim(),
           bucket: finalBucket,
+          publicUrl: publicUrl.trim() || undefined,
+        };
+      } else if (type === "oracle") {
+        if (!namespace.trim()) { showToast("请输入对象存储命名空间 (Namespace)", "error"); setLoading(false); return; }
+        if (!region.trim()) { showToast("请输入租户区域 (Region)", "error"); setLoading(false); return; }
+        if (!bucket.trim()) { showToast("请输入存储桶名称 (Bucket)", "error"); setLoading(false); return; }
+        if (!accessKeyId.trim()) { showToast("请输入客户密钥的访问密钥 (Access Key ID)", "error"); setLoading(false); return; }
+        if (!secretAccessKey.trim()) { showToast("请输入客户密钥的密钥 (Secret Access Key)", "error"); setLoading(false); return; }
+
+        submitConfig.oracleConfig = {
+          namespace: namespace.trim(),
+          region: region.trim(),
+          accessKeyId: accessKeyId.trim(),
+          secretAccessKey: secretAccessKey.trim(),
+          bucket: bucket.trim(),
           publicUrl: publicUrl.trim() || undefined,
         };
       } else if (type === "vercel-blob") {
@@ -335,13 +357,14 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
           <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>接入供应商 / 协议</label>
           <select className="input" value={provider} onChange={(e) => setProvider(e.target.value as any)} disabled={isEdit}>
             <option value="r2-external">Cloudflare R2（外部账号 S3 接入）</option>
+            <option value="oracle">甲骨文云 OCI 对象存储</option>
             <option value="s3-general">AWS S3 / 其他 S3 兼容存储</option>
             <option value="vercel-blob">Vercel Blob</option>
           </select>
         </div>
         <div>
           <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>显示名称</label>
-          <input className="input" placeholder="如：外部 R2 备份桶" value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="input" placeholder="如：甲骨文云免费存储" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
 
         {provider === "r2-external" && (
@@ -385,6 +408,85 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
               <input
                 className="input"
                 placeholder="如：https://img2.yourdomain.com (留空则默认通过图床本域代理路由进行强缓存访问)"
+                value={publicUrl}
+                onChange={(e) => setPublicUrl(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+
+        {provider === "oracle" && (
+          <>
+            <div style={{
+              background: "rgba(59, 130, 246, 0.08)",
+              borderLeft: "4px solid #3b82f6",
+              padding: "10px 14px",
+              borderRadius: "0 6px 6px 0",
+              fontSize: "12px",
+              color: "var(--color-text-secondary)",
+              lineHeight: "1.5",
+              margin: "8px 0"
+            }}>
+              <span style={{ fontWeight: "bold", color: "#2563eb", display: "block", marginBottom: 4 }}>
+                🍊 提示：系统会自动拼接 Endpoint
+              </span>
+              我们会根据您填写的 <strong>对象存储命名空间 (Namespace)</strong> 与 <strong>租户区域 (Region)</strong>，在后台自动拼接出标准的 S3 服务终点 Endpoint，无需您手动输入复杂的 URL 链接！
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>对象存储命名空间 (Namespace)</label>
+                <input
+                  className="input"
+                  placeholder="请输入如：ax3o8gxxxxx"
+                  value={namespace}
+                  onChange={(e) => setNamespace(e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>租户区域 (Region)</label>
+                <input
+                  className="input"
+                  placeholder="如：ap-tokyo-1"
+                  value={region}
+                  onChange={(e) => setRegion(e.target.value)}
+                />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>客户密钥的访问密钥 (Access Key ID)</label>
+                <input
+                  className="input"
+                  placeholder={isEdit ? "留空或保持未更改" : "请填写甲骨文云客户密钥中的 Access Key"}
+                  value={accessKeyId}
+                  onChange={(e) => setAccessKeyId(e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>客户密钥的密钥 (Secret Access Key)</label>
+                <input
+                  className="input"
+                  type="password"
+                  placeholder={isEdit ? "留空或保持未更改" : "请填写甲骨文云生成时展示的 Secret Key"}
+                  value={secretAccessKey}
+                  onChange={(e) => setSecretAccessKey(e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>存储桶的名称 (Bucket)</label>
+              <input
+                className="input"
+                placeholder="如：momoimage"
+                value={bucket}
+                onChange={(e) => setBucket(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>自定义直链域名 (Public URL) (可选)</label>
+              <input
+                className="input"
+                placeholder="若设为公共桶，可填写拼接的 OCI 直链 (留空则默认通过图床系统安全代理流式输出)"
                 value={publicUrl}
                 onChange={(e) => setPublicUrl(e.target.value)}
               />
