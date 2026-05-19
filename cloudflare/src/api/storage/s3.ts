@@ -46,6 +46,10 @@ export class S3Adapter implements StorageAdapter {
         secretAccessKey: config.secretAccessKey,
       },
       forcePathStyle: config.forcePathStyle ?? true,
+      // 禁用 S3 v3 默认自动在 PutObject 发送的现代校验算法（如 CRC32 等）
+      // 解决甲骨文 OCI 对象存储等三方 S3 兼容服务在大文件上传时抛出“未提供完成身份验证所需信息”的兼容性问题
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED",
     });
     this.bucket = config.bucket;
     this.publicUrl = config.publicUrl?.replace(/\/$/, "") || "";
