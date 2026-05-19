@@ -295,12 +295,10 @@ export function ImageGrid({
               onClick={() => {
                 if (isMultiSelectMode) {
                   handleToggleSelect(image.id);
-                } else {
-                  onCopyLink(image);
                 }
               }}
               style={{
-                cursor: "pointer",
+                cursor: isMultiSelectMode ? "pointer" : "default",
                 position: "relative",
                 border: selectedIds.includes(image.id) ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
                 transform: selectedIds.includes(image.id) ? "scale(0.98)" : "none",
@@ -335,7 +333,16 @@ export function ImageGrid({
                 </div>
               )}
 
-              <div className="image-card__preview" style={{ position: "relative" }}>
+              <div
+                className="image-card__preview"
+                style={{ position: "relative", cursor: "pointer" }}
+                onClick={(e) => {
+                  if (!isMultiSelectMode) {
+                    e.stopPropagation();
+                    onCopyLink(image);
+                  }
+                }}
+              >
                 <img
                   src={image.thumbnailUrl || image.url}
                   alt={image.originalName}
