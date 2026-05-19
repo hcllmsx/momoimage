@@ -84,13 +84,19 @@ export class S3Adapter implements StorageAdapter {
       body = data;
     }
 
+    const sanitizedMetadata = options?.metadata
+      ? Object.fromEntries(
+          Object.entries(options.metadata).map(([k, v]) => [k, encodeURIComponent(v)])
+        )
+      : undefined;
+
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
         Body: body,
         ContentType: options?.contentType,
-        Metadata: options?.metadata,
+        Metadata: sanitizedMetadata,
       })
     );
 
