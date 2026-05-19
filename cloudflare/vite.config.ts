@@ -13,4 +13,10 @@ export default defineConfig({
       "@client": fileURLToPath(new URL("./src/client", import.meta.url)),
     },
   },
+  server: {
+    proxy: {
+      "/api": "http://localhost:8787",
+      "/i": "http://localhost:8787",
+    },
+  },
 });

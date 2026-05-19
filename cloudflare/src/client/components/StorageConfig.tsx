@@ -355,7 +355,24 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
       <div style={{ display: "grid", gap: 12 }}>
         <div>
           <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>接入供应商 / 协议</label>
-          <select className="input" value={provider} onChange={(e) => setProvider(e.target.value as any)} disabled={isEdit}>
+          <select
+            className="input"
+            value={provider}
+            onChange={(e) => {
+              const val = e.target.value as any;
+              setProvider(val);
+              if (val === "oracle") {
+                if (region === "auto") {
+                  setRegion("");
+                }
+              } else if (val === "r2-external" || val === "s3-general") {
+                if (!region) {
+                  setRegion("auto");
+                }
+              }
+            }}
+            disabled={isEdit}
+          >
             <option value="r2-external">Cloudflare R2（外部账号 S3 接入）</option>
             <option value="oracle">甲骨文云 OCI 对象存储</option>
             <option value="s3-general">AWS S3 / 其他 S3 兼容存储</option>
@@ -373,7 +390,7 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
               <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>R2 S3 API 链接（直接从 CF 后台粘贴）</label>
               <input
                 className="input"
-                placeholder="如：https://bbc8b9c5cc750d0aa6f44e95a9eade11.r2.cloudflarestorage.com/momoimage"
+                placeholder="如：https://xxx.r2.cloudflarestorage.com/momoimage"
                 value={r2S3ApiUrl}
                 onChange={(e) => setR2S3ApiUrl(e.target.value)}
               />
@@ -550,7 +567,7 @@ function TokenManager() {
   const { showToast } = useToastContext();
 
   useEffect(() => {
-    api.listApiTokens().then(setTokens).catch(() => {});
+    api.listApiTokens().then(setTokens).catch(() => { });
   }, []);
 
   const handleCreate = async () => {

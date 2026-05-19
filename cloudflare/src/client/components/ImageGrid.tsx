@@ -46,6 +46,7 @@ export function ImageGrid({
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBatchMoving, setIsBatchMoving] = useState(false);
+  const [isBatchOperating, setIsBatchOperating] = useState(false);
 
   const currentFolder = folders.find((f) => f.id === currentFolderId);
 
@@ -135,11 +136,14 @@ export function ImageGrid({
     if (selectedIds.length === 0) return;
     if (confirm(`确定要删除选中的 ${selectedIds.length} 张图片吗？此操作无法恢复！`)) {
       try {
+        setIsBatchOperating(true);
         await onDeleteMultiple(selectedIds);
         setSelectedIds([]);
         setIsMultiSelectMode(false);
       } catch (err) {
         showToast(err instanceof Error ? err.message : "批量删除失败", "error");
+      } finally {
+        setIsBatchOperating(false);
       }
     }
   };
@@ -147,17 +151,30 @@ export function ImageGrid({
   const handleConfirmBatchMove = async (folderId: string | null) => {
     if (selectedIds.length === 0) return;
     try {
+      setIsBatchOperating(true);
       await onMoveMultiple(selectedIds, folderId);
       setIsBatchMoving(false);
       setSelectedIds([]);
       setIsMultiSelectMode(false);
     } catch (err) {
       showToast(err instanceof Error ? err.message : "批量分类失败", "error");
+    } finally {
+      setIsBatchOperating(false);
     }
   };
 
   return (
     <div>
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
       {/* 文件夹头部与面包屑导航 */}
       <div className="folder-header">
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 500 }}>
@@ -502,49 +519,89 @@ export function ImageGrid({
       {isMultiSelectMode && selectedIds.length > 0 && (
         <div style={{
           position: "fixed",
-          bottom: 24,
+          bottom: 80, // 整体上移，确保高于页脚文字
           left: "50%",
           transform: "translateX(-50%)",
-          background: "var(--color-bg-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-md)",
-          padding: "12px 24px",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
-          gap: 16,
-          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)",
+          gap: 12,
           zIndex: 1000,
-          backdropFilter: "blur(8px)",
-          animation: "barSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+          pointerEvents: "none", // 允许鼠标事件穿透非交互区域
         }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>
-            已选择 {selectedIds.length} 张图片
-          </span>
-          <div style={{ width: 1, height: 20, background: "var(--color-border)" }} />
-          
-          <button
-            className="btn btn--primary btn--sm"
-            onClick={handleBatchCopyLinks}
-            style={{ display: "flex", alignItems: "center", gap: 6 }}
-          >
-            🔗 批量复制链接
-          </button>
-          
-          <button
-            className="btn btn--ghost btn--sm"
-            onClick={() => setIsBatchMoving(true)}
-            style={{ display: "flex", alignItems: "center", gap: 6, border: "1px solid var(--color-border)" }}
-          >
-            📁 批量分类
-          </button>
-          
-          <button
-            className="btn btn--danger btn--sm"
-            onClick={handleBatchDeleteClick}
-            style={{ display: "flex", alignItems: "center", gap: 6 }}
-          >
-            🗑️ 批量删除
-          </button>
+          {/* 批量操作加载动画，显示在操作栏正上方 */}
+          {isBatchOperating && (
+            <div style={{
+              background: "var(--color-bg-surface)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-md)",
+              padding: "10px 20px",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)",
+              backdropFilter: "blur(12px)",
+              animation: "fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+              pointerEvents: "auto",
+            }}>
+              <span className="spinner" style={{
+                width: 14,
+                height: 14,
+                border: "2px solid var(--color-border)",
+                borderTopColor: "var(--color-primary)",
+                borderRadius: "50%",
+                animation: "spin 0.8s linear infinite",
+              }} />
+              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-secondary)" }}>
+                正在处理中，请稍候...
+              </span>
+            </div>
+          )}
+
+          {/* 批量操作按钮栏 */}
+          <div style={{
+            background: "var(--color-bg-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            padding: "12px 24px",
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3)",
+            backdropFilter: "blur(12px)",
+            animation: "barSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+            opacity: isBatchOperating ? 0.6 : 1,
+            pointerEvents: isBatchOperating ? "none" : "auto", // 正在处理时禁用全部按钮交互
+          }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>
+              已选择 {selectedIds.length} 张图片
+            </span>
+            <div style={{ width: 1, height: 20, background: "var(--color-border)" }} />
+            
+            <button
+              className="btn btn--primary btn--sm"
+              onClick={handleBatchCopyLinks}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              🔗 批量复制链接
+            </button>
+            
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={() => setIsBatchMoving(true)}
+              style={{ display: "flex", alignItems: "center", gap: 6, border: "1px solid var(--color-border)" }}
+            >
+              📁 批量分类
+            </button>
+            
+            <button
+              className="btn btn--danger btn--sm"
+              onClick={handleBatchDeleteClick}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              🗑️ 批量删除
+            </button>
+          </div>
         </div>
       )}
 
