@@ -119,11 +119,15 @@ export async function uploadImage(
   file: File,
   storageId?: string,
   folderId?: string,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  thumbnail?: Blob
 ): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
     formData.append("file", file);
+    if (thumbnail) {
+      formData.append("thumbnail", thumbnail, "thumbnail.jpg");
+    }
     if (folderId) {
       formData.append("folderId", folderId);
     }

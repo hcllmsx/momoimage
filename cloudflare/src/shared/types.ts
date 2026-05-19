@@ -24,6 +24,8 @@ export interface ImageMeta {
   storageId: string;
   /** 公开访问 URL */
   url: string;
+  /** 缩略图公开访问 URL */
+  thumbnailUrl?: string;
   /** 所属文件夹 ID */
   folderId?: string;
 }

@@ -17,6 +17,83 @@ interface UploadItem {
   error?: string;
 }
 
+/**
+ * 产生缩略图的辅助函数 (Canvas 硬件加速)
+ * 仅对原图大小 > 800KB 或者 分辨率(单边长) > 1200px 的非 GIF / SVG 进行压制
+ */
+function generateThumbnailIfNeeded(file: File): Promise<Blob | undefined> {
+  return new Promise((resolve) => {
+    // 过滤掉 GIF 和 SVG，保留其完美动效和矢量特征
+    if (file.type === "image/gif" || file.type === "image/svg+xml") {
+      return resolve(undefined);
+    }
+
+    // 排除非图片文件类型
+    if (!file.type.startsWith("image/")) {
+      return resolve(undefined);
+    }
+
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.src = url;
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+
+      const width = img.naturalWidth;
+      const height = img.naturalHeight;
+
+      // 双轨边界触发：大小 > 800KB 或单边长 > 1200px
+      if (file.size > 800 * 1024 || width > 1200 || height > 1200) {
+        const maxSide = 400;
+        let targetWidth = width;
+        let targetHeight = height;
+
+        if (width > maxSide || height > maxSide) {
+          if (width > height) {
+            targetWidth = maxSide;
+            targetHeight = Math.round((height * maxSide) / width);
+          } else {
+            targetHeight = maxSide;
+            targetWidth = Math.round((width * maxSide) / height);
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          return resolve(undefined);
+        }
+
+        // 启用高质量图像平滑以确保画面锐利清晰
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+        // 导出通用 JPEG 格式（0.7 质量），100% 浏览器兼容，体积约 15-25KB
+        canvas.toBlob(
+          (blob) => {
+            resolve(blob || undefined);
+          },
+          "image/jpeg",
+          0.7
+        );
+      } else {
+        resolve(undefined);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(undefined);
+    };
+  });
+}
+
 export function UploadZone({
   onUploadSuccess,
 }: {
@@ -155,10 +232,15 @@ export function UploadZone({
       }, 60);
 
       try {
+        // 在前端利用 Canvas 硬件加速生成缩略图（若满足大图/高分辨率触发阈值）
+        const thumbnailBlob = await generateThumbnailIfNeeded(item.file);
+
         const result = await api.uploadImage(
           item.file,
           selectedStorageId || undefined,
-          selectedFolderId || undefined
+          selectedFolderId || undefined,
+          undefined,
+          thumbnailBlob
         );
 
         clearInterval(progressTimer);

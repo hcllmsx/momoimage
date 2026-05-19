@@ -89,6 +89,13 @@ images.get("/", async (c) => {
     if (meta) {
       // 统一动态改写为当前系统的自定义直链域名，确保前端预览、详情卡片与分享链接 100% 对齐一致！
       meta.url = `${baseUrl}/i/${meta.key}`;
+      if (meta.thumbnailUrl) {
+        const lastDotIndex = meta.key.lastIndexOf(".");
+        const thumbnailKey = lastDotIndex !== -1 
+          ? `${meta.key.slice(0, lastDotIndex)}_thumb.jpg` 
+          : `${meta.key}_thumb.jpg`;
+        meta.thumbnailUrl = `${baseUrl}/i/${thumbnailKey}`;
+      }
       items.push(meta);
     }
   }
@@ -115,7 +122,15 @@ images.get("/:id", async (c) => {
   }
 
   const siteUrl = c.env.SITE_URL || new URL(c.req.url).origin;
-  meta.url = `${siteUrl.replace(/\/$/, "")}/i/${meta.key}`;
+  const baseUrl = siteUrl.replace(/\/$/, "");
+  meta.url = `${baseUrl}/i/${meta.key}`;
+  if (meta.thumbnailUrl) {
+    const lastDotIndex = meta.key.lastIndexOf(".");
+    const thumbnailKey = lastDotIndex !== -1 
+      ? `${meta.key.slice(0, lastDotIndex)}_thumb.jpg` 
+      : `${meta.key}_thumb.jpg`;
+    meta.thumbnailUrl = `${baseUrl}/i/${thumbnailKey}`;
+  }
 
   return c.json({ success: true, data: meta });
 });
@@ -137,11 +152,33 @@ images.delete("/:id", async (c) => {
     const adapter = storageManager.getAdapter(meta.storageId);
     if (adapter) {
       await adapter.delete(meta.key);
+      
+      // 如果存在缩略图，顺便物理删掉缩略图文件
+      if (meta.thumbnailUrl) {
+        const lastDotIndex = meta.key.lastIndexOf(".");
+        const thumbnailKey = lastDotIndex !== -1 
+          ? `${meta.key.slice(0, lastDotIndex)}_thumb.jpg` 
+          : `${meta.key}_thumb.jpg`;
+        try {
+          await adapter.delete(thumbnailKey);
+        } catch (err) {
+          console.error("Failed to delete thumbnail file:", err);
+        }
+      }
     }
 
     // 删除元数据
     await kv.delete(`momoimage:image:${id}`);
     await kv.delete(`momoimage:key:${meta.key}`);
+    
+    // 清理缩略图的 KV 路径映射关系
+    if (meta.thumbnailUrl) {
+      const lastDotIndex = meta.key.lastIndexOf(".");
+      const thumbnailKey = lastDotIndex !== -1 
+        ? `${meta.key.slice(0, lastDotIndex)}_thumb.jpg` 
+        : `${meta.key}_thumb.jpg`;
+      await kv.delete(`momoimage:key:${thumbnailKey}`);
+    }
 
     // 从全局列表索引中移除
     const listKey = "momoimage:image:list";
@@ -327,12 +364,34 @@ images.post("/batch/delete", async (c) => {
       const adapter = storageManager.getAdapter(meta.storageId);
       if (adapter) {
         await adapter.delete(meta.key);
+        
+        // 批量删除时同时物理清除缩略图
+        if (meta.thumbnailUrl) {
+          const lastDotIndex = meta.key.lastIndexOf(".");
+          const thumbnailKey = lastDotIndex !== -1 
+            ? `${meta.key.slice(0, lastDotIndex)}_thumb.jpg` 
+            : `${meta.key}_thumb.jpg`;
+          try {
+            await adapter.delete(thumbnailKey);
+          } catch (err) {
+            console.error("Failed to delete batch thumbnail file:", err);
+          }
+        }
       }
     } catch (err) {
       console.error(`Failed to delete physical file for key ${meta.key}:`, err);
     }
     await kv.delete(`momoimage:image:${meta.id}`);
     await kv.delete(`momoimage:key:${meta.key}`);
+    
+    // 批量清除缩略图的 KV 路径映射关系
+    if (meta.thumbnailUrl) {
+      const lastDotIndex = meta.key.lastIndexOf(".");
+      const thumbnailKey = lastDotIndex !== -1 
+        ? `${meta.key.slice(0, lastDotIndex)}_thumb.jpg` 
+        : `${meta.key}_thumb.jpg`;
+      await kv.delete(`momoimage:key:${thumbnailKey}`);
+    }
   });
 
   await Promise.all(deletePromises);

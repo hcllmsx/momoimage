@@ -334,7 +334,7 @@ export function ImageGrid({
 
               <div className="image-card__preview">
                 <img
-                  src={image.url}
+                  src={image.thumbnailUrl || image.url}
                   alt={image.originalName}
                   loading="lazy"
                 />

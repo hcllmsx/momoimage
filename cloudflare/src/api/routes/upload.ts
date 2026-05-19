@@ -36,6 +36,7 @@ upload.post("/", async (c) => {
 
   const body = await c.req.parseBody();
   const file = body["file"];
+  const thumbnail = body["thumbnail"];
 
   if (!(file instanceof File)) {
     return c.json({ success: false, error: "请提供图片文件" }, 400);
@@ -111,6 +112,25 @@ upload.post("/", async (c) => {
       },
     });
 
+    // 缩略图物理保存逻辑
+    let hasThumbnail = false;
+    let thumbnailKey = "";
+    if (thumbnail instanceof File) {
+      const lastDotIndex = key.lastIndexOf(".");
+      thumbnailKey = lastDotIndex !== -1 
+        ? `${key.slice(0, lastDotIndex)}_thumb.jpg` 
+        : `${key}_thumb.jpg`;
+      
+      const thumbBuffer = await thumbnail.arrayBuffer();
+      await adapter.put(thumbnailKey, thumbBuffer, {
+        contentType: "image/jpeg",
+        metadata: {
+          originalName: `thumb_${file.name}`,
+        },
+      });
+      hasThumbnail = true;
+    }
+
     // 保存元数据到 KV
     const meta: ImageMeta = {
       id,
@@ -121,12 +141,16 @@ upload.post("/", async (c) => {
       uploadedAt: new Date().toISOString(),
       storageId: finalStorageId,
       url: result.url,
+      thumbnailUrl: hasThumbnail ? `${siteUrl}/i/${thumbnailKey}` : undefined,
       folderId: folderId || undefined,
     };
 
     const kv = c.env.KV_META;
     await kv.put(`momoimage:image:${id}`, JSON.stringify(meta));
     await kv.put(`momoimage:key:${key}`, id);
+    if (hasThumbnail) {
+      await kv.put(`momoimage:key:${thumbnailKey}`, id);
+    }
 
     // 更新图片列表索引
     await addToImageIndex(kv, id, folderId);
