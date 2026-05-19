@@ -335,63 +335,62 @@ export function ImageGrid({
                 </div>
               )}
 
-              <div className="image-card__preview">
+              <div className="image-card__preview" style={{ position: "relative" }}>
                 <img
                   src={image.thumbnailUrl || image.url}
                   alt={image.originalName}
                   loading="lazy"
                 />
-              </div>
-
-              {/* 仅在非多选模式下显示悬浮动作栏 */}
-              {!isMultiSelectMode && (
-                <div className="image-card__overlay">
-                  <div className="image-card__actions" style={{ gap: 6 }}>
-                    <button
-                      className="btn btn--ghost btn--sm"
-                      title="图片细节"
-                      style={{ minWidth: 32, padding: 0 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLightboxImage(image);
-                      }}
-                    >
-                      📋
-                    </button>
-                    <button
-                      className="btn btn--ghost btn--sm"
-                      onClick={(e) => handleMoveClick(e, image.id)}
-                      title="移动至文件夹分类"
-                      style={{ minWidth: 32, padding: 0 }}
-                    >
-                      📁
-                    </button>
-                    <button
-                      className="btn btn--ghost btn--sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleQuickCopy(image);
-                      }}
-                      title="快速复制 URL"
-                      style={{ minWidth: 32, padding: 0 }}
-                    >
-                      🔗
-                    </button>
-                    <button
-                      className="btn btn--ghost btn--sm btn--delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm("确定要删除这张图片吗？")) {
-                          onDelete(image.id);
-                        }
-                      }}
-                      style={{ minWidth: 32, padding: 0 }}
-                    >
-                      🗑️
-                    </button>
+                {/* 仅在非多选模式下显示悬浮动作栏 */}
+                {!isMultiSelectMode && (
+                  <div className="image-card__overlay">
+                    <div className="image-card__actions" style={{ gap: 6 }}>
+                      <button
+                        className="btn btn--ghost btn--sm"
+                        title="图片细节"
+                        style={{ minWidth: 32, padding: 0 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLightboxImage(image);
+                        }}
+                      >
+                        📋
+                      </button>
+                      <button
+                        className="btn btn--ghost btn--sm"
+                        onClick={(e) => handleMoveClick(e, image.id)}
+                        title="移动至文件夹分类"
+                        style={{ minWidth: 32, padding: 0 }}
+                      >
+                        📁
+                      </button>
+                      <button
+                        className="btn btn--ghost btn--sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleQuickCopy(image);
+                        }}
+                        title="快速复制 URL"
+                        style={{ minWidth: 32, padding: 0 }}
+                      >
+                        🔗
+                      </button>
+                      <button
+                        className="btn btn--ghost btn--sm btn--delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm("确定要删除这张图片吗？")) {
+                            onDelete(image.id);
+                          }
+                        }}
+                        style={{ minWidth: 32, padding: 0 }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               <div className="image-card__info">
                 <div className="image-card__name" title={image.originalName}>
