@@ -43,10 +43,6 @@ export default function App() {
   );
   const { toasts, showToast, removeToast } = useToast();
 
-  const [theme, setTheme] = useState<"light" | "dark">(
-    () => (localStorage.getItem("momoimage:theme") as "light" | "dark") || "light"
-  );
-
   const [folders, setFolders] = useState<Folder[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
@@ -55,16 +51,10 @@ export default function App() {
     localStorage.setItem("momoimage:activeTab", activeTab);
   }, [activeTab]);
 
-  // 挂载主题类名
+  // 挂载主题类名（统一且高性能地保持白天模式）
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "light") {
-      root.classList.add("light-theme");
-    } else {
-      root.classList.remove("light-theme");
-    }
-    localStorage.setItem("momoimage:theme", theme);
-  }, [theme]);
+    document.documentElement.classList.add("light-theme");
+  }, []);
 
   // 加载系统级全部图片总数统计
   const loadSystemStats = useCallback(async () => {
@@ -270,8 +260,6 @@ export default function App() {
     <ToastContext.Provider value={{ showToast }}>
       <div className="app-layout">
         <Header
-          theme={theme}
-          onToggleTheme={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
           onLogout={handleLogout}
         />
 
