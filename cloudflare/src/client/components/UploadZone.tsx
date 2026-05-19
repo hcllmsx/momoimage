@@ -131,7 +131,6 @@ export function UploadZone({
       );
 
       let simulatedProgress = 0;
-      let actualProgress = 0;
 
       // 60ms 刷新率的极客拟合曲线定时器，确保视觉动效极致丝滑
       const progressTimer = setInterval(() => {
@@ -146,10 +145,7 @@ export function UploadZone({
           simulatedProgress += Math.random() * 0.1 + 0.05;
         }
 
-        const displayProgress = Math.min(
-          99,
-          Math.max(Math.round(simulatedProgress), Math.round(actualProgress * 0.95))
-        );
+        const displayProgress = Math.min(99, Math.round(simulatedProgress));
 
         setUploads((prev) =>
           prev.map((u) =>
@@ -162,10 +158,7 @@ export function UploadZone({
         const result = await api.uploadImage(
           item.file,
           selectedStorageId || undefined,
-          selectedFolderId || undefined,
-          (percent) => {
-            actualProgress = percent;
-          }
+          selectedFolderId || undefined
         );
 
         clearInterval(progressTimer);

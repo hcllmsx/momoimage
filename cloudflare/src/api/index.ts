@@ -86,6 +86,7 @@ app.get("/i/*", async (c) => {
 
   const kv = c.env.KV_META;
   let adapter = manager.getDefault();
+  let resolvedStorageId = manager.getConfigs().find(cfg => cfg.isDefault && cfg.enabled)?.id || "local-r2";
 
   // 尝试通过 KV 映射关系查询该图片具体存储在哪个后端
   try {
@@ -97,6 +98,7 @@ app.get("/i/*", async (c) => {
         const targetAdapter = manager.getAdapter(meta.storageId);
         if (targetAdapter) {
           adapter = targetAdapter;
+          resolvedStorageId = meta.storageId;
         }
       }
     }
@@ -106,7 +108,50 @@ app.get("/i/*", async (c) => {
 
   if (!adapter) return c.text("Storage not configured", 500);
 
-  const result = await adapter.get(decodeURIComponent(key));
+  let result = await adapter.get(decodeURIComponent(key));
+  
+  // 自愈降级与自愈机制：如果从指定/默认适配器找不到图片（通常是由于老旧图片缺乏对应映射），则尝试从其他启用的存储中拉取
+  if (!result) {
+    const configs = manager.getConfigs().filter((cfg) => cfg.enabled && cfg.id !== resolvedStorageId);
+    for (const config of configs) {
+      const targetAdapter = manager.getAdapter(config.id);
+      if (targetAdapter) {
+        try {
+          const fallbackResult = await targetAdapter.get(decodeURIComponent(key));
+          if (fallbackResult) {
+            result = fallbackResult;
+            
+            // 自愈：在后台自动寻找匹配此 key 的图片 id，并重新注册 KV 的 key->id 映射，实现数据库自动升级自愈
+            const repairTask = async () => {
+              try {
+                const list = ((await kv.get("momoimage:image:list", "json")) ?? []) as string[];
+                for (const imgId of list) {
+                  const meta = (await kv.get(`momoimage:image:${imgId}`, "json")) as any;
+                  if (meta && meta.key === decodeURIComponent(key)) {
+                    await kv.put(`momoimage:key:${decodeURIComponent(key)}`, imgId);
+                    console.log(`[Auto-Repair] Successfully auto-repaired legacy key mapping for ${key} -> ${imgId}`);
+                    break;
+                  }
+                }
+              } catch (repairErr) {
+                console.error("[Auto-Repair] Failed to repair key mapping:", repairErr);
+              }
+            };
+
+            if (c.executionCtx) {
+              c.executionCtx.waitUntil(repairTask());
+            } else {
+              repairTask();
+            }
+            break;
+          }
+        } catch (err) {
+          console.error(`Fallback failed for adapter ${config.id}:`, err);
+        }
+      }
+    }
+  }
+
   if (!result) return c.text("Not Found", 404);
 
   return new Response(result.body, {
