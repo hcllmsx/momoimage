@@ -42,10 +42,15 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 }
 
 /** 获取存储类型的显示名称 */
-export function getStorageTypeName(type: string): string {
+export function getStorageTypeName(type: string, config?: any): string {
+  if (type === "s3") {
+    if (config?.s3Config?.endpoint?.includes("r2.cloudflarestorage.com")) {
+      return "Cloudflare R2";
+    }
+    return "S3 兼容存储";
+  }
   const map: Record<string, string> = {
     "r2-binding": "Cloudflare R2",
-    s3: "S3 兼容存储",
     "vercel-blob": "Vercel Blob",
     oracle: "甲骨文云 OCI 对象存储",
   };

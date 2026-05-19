@@ -120,7 +120,7 @@ export function StorageConfig() {
                       {config.isDefault && <span className="storage-item__badge" style={{ marginLeft: 8 }}>默认</span>}
                     </div>
                     <div className="storage-item__type">
-                      {getStorageTypeName(config.type)}
+                      {getStorageTypeName(config.type, config)}
                       {config.usedSize !== undefined && (
                         <span style={{ marginLeft: 12, opacity: 0.6, fontSize: "11px" }}>
                           📊 已存容量: {formatFileSize(config.usedSize)} ({config.fileCount} 张图片)
