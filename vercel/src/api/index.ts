@@ -57,7 +57,7 @@ app.use("/api/*", async (c, next) => {
 // ========= 公开路由（无需认证） =========
 
 // 系统信息
-app.get("/api/info", (c) => {
+app.get("/api/info", async (c) => {
   const siteUrl = getSiteUrl(c);
   const isDefaultDomain =
     siteUrl.includes(".workers.dev") || 
@@ -68,6 +68,24 @@ app.get("/api/info", (c) => {
   // 根据是否有 Vercel Blob Token 自动切换部署平台标识
   const deployTarget = c.env.BLOB_READ_WRITE_TOKEN ? "vercel" : "cloudflare";
 
+  // 主动诊断 KV/Redis 数据库连通性
+  let isKvValid = false;
+  const kv = c.env.KV_META;
+  if (kv) {
+    try {
+      // 通过对特定保留 key 执行轻量 get，检测底层 Redis 是否正常连接（若未配置环境变量，get 会抛错）
+      await kv.get("momoimage:system:test_connection");
+      isKvValid = true;
+    } catch (err) {
+      console.error("[Diagnostics] KV database connection check failed:", err);
+    }
+  }
+
+  // 诊断内置本地存储是否已配置
+  const isStorageValid = deployTarget === "vercel" 
+    ? !!c.env.BLOB_READ_WRITE_TOKEN 
+    : !!c.env.R2_BUCKET;
+
   return c.json({
     success: true,
     data: {
@@ -76,6 +94,8 @@ app.get("/api/info", (c) => {
       deployTarget,
       version: "1.0.0",
       isDefaultPassword,
+      isKvValid,
+      isStorageValid,
     },
   });
 });

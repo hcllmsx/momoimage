@@ -146,4 +146,8 @@ export interface SystemInfo {
   version: string;
   /** 是否使用的是默认登录密码 */
   isDefaultPassword?: boolean;
+  /** 数据库是否配置且可用 */
+  isKvValid?: boolean;
+  /** 内置本地存储是否配置且可用 */
+  isStorageValid?: boolean;
 }

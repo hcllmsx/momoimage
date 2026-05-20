@@ -28,6 +28,15 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 app.use("*", cors());
 app.use("*", logger());
 
+// 全局错误拦截器，拦截 Cloudflare Workers 运行期间的未捕获错误并安全返回 JSON，防止抛出 HTML 异常
+app.onError((err, c) => {
+  console.error("[Hono] Uncaught Worker Error:", err);
+  return c.json({
+    success: false,
+    error: err.message || "服务器内部错误",
+  }, 500);
+});
+
 // 从请求中获取站点 URL（如果环境变量未设置，则自动检测）
 function getSiteUrl(c: { env: Env; req: { url: string } }): string {
   if (c.env.SITE_URL) return c.env.SITE_URL.replace(/\/$/, "");
@@ -53,11 +62,27 @@ app.use("/api/*", async (c, next) => {
 // ========= 公开路由（无需认证） =========
 
 // 系统信息
-app.get("/api/info", (c) => {
+app.get("/api/info", async (c) => {
   const siteUrl = getSiteUrl(c);
   const isDefaultDomain =
     siteUrl.includes(".workers.dev") || siteUrl.includes(".pages.dev");
   const isDefaultPassword = !c.env.ADMIN_PASSWORD;
+
+  // 主动诊断 KV_META 资源绑定连通性
+  let isKvValid = false;
+  const kv = c.env.KV_META;
+  if (kv) {
+    try {
+      await kv.get("momoimage:system:test_connection");
+      isKvValid = true;
+    } catch (err) {
+      console.error("[Diagnostics] CF KV connection check failed:", err);
+    }
+  }
+
+  // 诊断内置本地 R2 存储资源是否已绑定
+  const isStorageValid = !!c.env.R2_BUCKET;
+
   return c.json({
     success: true,
     data: {
@@ -66,6 +91,8 @@ app.get("/api/info", (c) => {
       deployTarget: "cloudflare",
       version: "1.0.0",
       isDefaultPassword,
+      isKvValid,
+      isStorageValid,
     },
   });
 });
