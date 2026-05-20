@@ -1,44 +1,41 @@
 // ============================================
-// 默默图床 — 认证中间件
+// 默默图床 — 认证中间件 (Vercel 原生版)
 // 支持 JWT 会话认证和 API Token 认证
 // ============================================
 
 import { createMiddleware } from "hono/factory";
 import type { Context } from "hono";
+import { kvGet, kvSet, kvGetJSON } from "../lib/kv";
 
 /**
  * 获取 JWT 密钥：优先用环境变量，否则自动生成并存储到 KV
  * 这样用户不需要手动配置 JWT_SECRET
  */
-export async function getJwtSecret(env: Env): Promise<string> {
+export async function getJwtSecret(jwtSecretEnv?: string): Promise<string> {
   // 1. 优先使用环境变量
-  if (env.JWT_SECRET) return env.JWT_SECRET;
+  if (jwtSecretEnv) return jwtSecretEnv;
 
   // 2. 从 KV 读取已生成的密钥
   const kvKey = "momoimage:system:jwt_secret";
-  const kv = env.KV_META;
-  if (kv) {
-    try {
-      const saved = await kv.get(kvKey);
-      if (saved) return saved;
+  try {
+    const saved = await kvGet(kvKey);
+    if (saved) return saved;
 
-      // 3. 首次使用，自动生成并保存
-      const bytes = new Uint8Array(48);
-      crypto.getRandomValues(bytes);
-      const secret = Array.from(bytes)
-        .map((b) => b.toString(36).padStart(2, "0"))
-        .join("");
-      
-      try {
-        await kv.put(kvKey, secret);
-      } catch (putErr) {
-        console.error("[VercelKV] Failed to save auto-generated JWT secret to KV:", putErr);
-        // 保存失败时不中断执行，继续返回此生成的临时密钥（对本次进程有效），防止彻底崩溃
-      }
-      return secret;
-    } catch (getErr) {
-      console.error("[VercelKV] Failed to read JWT secret from KV:", getErr);
+    // 3. 首次使用，自动生成并保存
+    const bytes = new Uint8Array(48);
+    crypto.getRandomValues(bytes);
+    const secret = Array.from(bytes)
+      .map((b) => b.toString(36).padStart(2, "0"))
+      .join("");
+    
+    try {
+      await kvSet(kvKey, secret);
+    } catch (putErr) {
+      console.error("[VercelKV] Failed to save auto-generated JWT secret:", putErr);
     }
+    return secret;
+  } catch (getErr) {
+    console.error("[VercelKV] Failed to read JWT secret from KV:", getErr);
   }
 
   // 实在没有 KV 也没有环境变量，用一个固定备用值（不安全，仅用于防崩溃）
@@ -70,7 +67,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
     return c.json({ success: false, error: "未提供认证信息" }, 401);
   }
 
-  const jwtSecret = await getJwtSecret(c.env);
+  const jwtSecret = await getJwtSecret(c.env.JWT_SECRET);
 
   // JWT Bearer 认证
   if (authHeader.startsWith("Bearer ")) {
@@ -90,8 +87,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
   // API Token 认证
   if (authHeader.startsWith("Token ")) {
     const token = authHeader.slice(6);
-    const kv = c.env.KV_META;
-    const isValid = await validateApiToken(kv, token);
+    const isValid = await validateApiToken(token);
     if (isValid) {
       c.set("auth", { isAdmin: false, tokenId: token.slice(0, 8) });
       await next();
@@ -167,21 +163,15 @@ async function verifyJwt(token: string, secret: string): Promise<JwtPayload> {
 }
 
 /** 验证 API Token */
-async function validateApiToken(
-  kv: any,
-  token: string
-): Promise<boolean> {
-  const tokenData = await kv.get(`momoimage:token:${token}`, "json");
+async function validateApiToken(token: string): Promise<boolean> {
+  const tokenData = await kvGetJSON<Record<string, unknown>>(`momoimage:token:${token}`);
   if (!tokenData) return false;
 
   // 更新最后使用时间
-  await kv.put(
-    `momoimage:token:${token}`,
-    JSON.stringify({
-      ...(tokenData as Record<string, unknown>),
-      lastUsedAt: new Date().toISOString(),
-    })
-  );
+  await kvSet(`momoimage:token:${token}`, {
+    ...tokenData,
+    lastUsedAt: new Date().toISOString(),
+  });
 
   return true;
 }

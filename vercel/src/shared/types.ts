@@ -38,7 +38,7 @@ export interface Folder {
 }
 
 /** 存储后端类型 */
-export type StorageType = "r2-binding" | "s3" | "vercel-blob" | "oracle";
+export type StorageType = "s3" | "vercel-blob" | "oracle";
 
 /** 存储后端配置 */
 export interface StorageConfig {

@@ -1,9 +1,10 @@
 // ============================================
-// 默默图床 — 存储管理路由
+// 默默图床 — 存储管理路由 (Vercel 原生版)
 // ============================================
 
 import { Hono } from "hono";
 import type { StorageConfig } from "@shared/types";
+import { kvGetJSON } from "../lib/kv";
 import { StorageManager } from "../storage/manager";
 
 type Variables = { storageManager: StorageManager };
@@ -12,7 +13,6 @@ const storage = new Hono<{ Bindings: Env; Variables: Variables }>();
 /** 获取所有存储后端配置（包括已用空间和文件数统计） */
 storage.get("/", async (c) => {
   const storageManager = c.get("storageManager") as StorageManager;
-  const kv = c.env.KV_META;
 
   const configs = storageManager.getConfigs();
   const usedSizes: Record<string, number> = {};
@@ -24,19 +24,16 @@ storage.get("/", async (c) => {
   });
 
   try {
-    const allIds = ((await kv.get("momoimage:image:list", "json")) ?? []) as string[];
+    const allIds = ((await kvGetJSON<string[]>("momoimage:image:list")) ?? []);
     const batchSize = 100;
     for (let i = 0; i < allIds.length; i += batchSize) {
       const batchIds = allIds.slice(i, i + batchSize);
-      const batchPromises = batchIds.map(id => kv.get(`momoimage:image:${id}`, "json"));
+      const batchPromises = batchIds.map(id => kvGetJSON<any>(`momoimage:image:${id}`));
       const batchResults = await Promise.all(batchPromises);
       for (const meta of batchResults) {
         if (meta && typeof meta === "object") {
-          const m = meta as any;
-          // 向下兼容：如果图片没有 storageId，优先使用当前可用的本地存储（local-blob 或 local-r2）
-          const defaultLocalId = storageManager.getAdapter("local-blob") ? "local-blob" : "local-r2";
-          const sId = m.storageId || defaultLocalId;
-          const size = m.size || 0;
+          const sId = meta.storageId || "local-blob";
+          const size = meta.size || 0;
           if (usedSizes[sId] !== undefined) {
             usedSizes[sId] += size;
             fileCounts[sId] += 1;

@@ -1,9 +1,10 @@
 // ============================================
-// 默默图床 — 图片管理路由
+// 默默图床 — 图片管理路由 (Vercel 原生版)
 // ============================================
 
 import { Hono } from "hono";
 import type { ImageMeta, PaginatedResult } from "@shared/types";
+import { kvGetJSON, kvSet, kvDel } from "../lib/kv";
 import { StorageManager } from "../storage/manager";
 
 type Variables = { storageManager: StorageManager };
@@ -11,7 +12,6 @@ const images = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /** 获取图片列表（分页） */
 images.get("/", async (c) => {
-  const kv = c.env.KV_META;
   const page = parseInt(c.req.query("page") || "1", 10);
   const pageSize = parseInt(c.req.query("pageSize") || "20", 10);
 
@@ -25,7 +25,7 @@ images.get("/", async (c) => {
     listKey = "momoimage:image:list";
   } else {
     // 根目录逻辑：如果系统内一个文件夹都没有创建过，为向下兼容显示全部图片
-    const folders = ((await kv.get("momoimage:folders", "json")) ?? []) as unknown[];
+    const folders = ((await kvGetJSON<unknown[]>("momoimage:folders")) ?? []);
     if (folders.length === 0) {
       listKey = "momoimage:image:list";
     } else {
@@ -35,18 +35,18 @@ images.get("/", async (c) => {
 
   // 获取全局所有有效的 ID
   const globalListKey = "momoimage:image:list";
-  const globalIds = ((await kv.get(globalListKey, "json")) ?? []) as string[];
+  const globalIds = ((await kvGetJSON<string[]>(globalListKey)) ?? []);
 
   // 获取该分类下原有的 ID 列表
-  let allIds = ((await kv.get(listKey, "json")) ?? []) as string[];
+  let allIds = ((await kvGetJSON<string[]>(listKey)) ?? []);
 
   // ==========================================
-  // ⚡️ 极速自动修复与索引对齐系统
+  // 极速自动修复与索引对齐系统
   // ==========================================
   // 并行获取所有全局图片的元数据
   const imageMetas = await Promise.all(
     globalIds.map(async (id) => {
-      const meta = await kv.get(`momoimage:image:${id}`, "json") as ImageMeta | null;
+      const meta = await kvGetJSON<ImageMeta>(`momoimage:image:${id}`);
       return { id, meta };
     })
   );
@@ -70,7 +70,7 @@ images.get("/", async (c) => {
   if (!isAligned) {
     console.log(`[Self-Healing] Index mismatch resolved for key: ${listKey}`);
     allIds = activeIds;
-    await kv.put(listKey, JSON.stringify(allIds));
+    await kvSet(listKey, allIds);
   }
 
   const total = allIds.length;
@@ -85,9 +85,9 @@ images.get("/", async (c) => {
   // 批量获取图片元数据
   const items: ImageMeta[] = [];
   for (const id of pageIds) {
-    const meta = (await kv.get(`momoimage:image:${id}`, "json")) as ImageMeta | null;
+    const meta = await kvGetJSON<ImageMeta>(`momoimage:image:${id}`);
     if (meta) {
-      // 统一动态改写为当前系统的自定义直链域名，确保前端预览、详情卡片与分享链接 100% 对齐一致！
+      // 统一动态改写为当前系统的自定义直链域名，确保前端预览、详情卡片与分享链接 100% 对齐一致
       meta.url = `${baseUrl}/i/${meta.key}`;
       if (meta.thumbnailUrl) {
         const lastDotIndex = meta.key.lastIndexOf(".");
@@ -114,9 +114,8 @@ images.get("/", async (c) => {
 /** 获取图片详情 */
 images.get("/:id", async (c) => {
   const id = c.req.param("id");
-  const kv = c.env.KV_META;
 
-  const meta = (await kv.get(`momoimage:image:${id}`, "json")) as ImageMeta | null;
+  const meta = await kvGetJSON<ImageMeta>(`momoimage:image:${id}`);
   if (!meta) {
     return c.json({ success: false, error: "图片不存在" }, 404);
   }
@@ -138,11 +137,10 @@ images.get("/:id", async (c) => {
 /** 删除图片 */
 images.delete("/:id", async (c) => {
   const id = c.req.param("id");
-  const kv = c.env.KV_META;
   const storageManager = c.get("storageManager") as StorageManager;
 
   // 获取图片元数据
-  const meta = (await kv.get(`momoimage:image:${id}`, "json")) as ImageMeta | null;
+  const meta = await kvGetJSON<ImageMeta>(`momoimage:image:${id}`);
   if (!meta) {
     return c.json({ success: false, error: "图片不存在" }, 404);
   }
@@ -168,8 +166,8 @@ images.delete("/:id", async (c) => {
     }
 
     // 删除元数据
-    await kv.delete(`momoimage:image:${id}`);
-    await kv.delete(`momoimage:key:${meta.key}`);
+    await kvDel(`momoimage:image:${id}`);
+    await kvDel(`momoimage:key:${meta.key}`);
     
     // 清理缩略图的 KV 路径映射关系
     if (meta.thumbnailUrl) {
@@ -177,22 +175,22 @@ images.delete("/:id", async (c) => {
       const thumbnailKey = lastDotIndex !== -1 
         ? `${meta.key.slice(0, lastDotIndex)}_thumb.jpg` 
         : `${meta.key}_thumb.jpg`;
-      await kv.delete(`momoimage:key:${thumbnailKey}`);
+      await kvDel(`momoimage:key:${thumbnailKey}`);
     }
 
     // 从全局列表索引中移除
     const listKey = "momoimage:image:list";
-    const allIds = ((await kv.get(listKey, "json")) ?? []) as string[];
+    const allIds = ((await kvGetJSON<string[]>(listKey)) ?? []);
     const newIds = allIds.filter((itemId) => itemId !== id);
-    await kv.put(listKey, JSON.stringify(newIds));
+    await kvSet(listKey, newIds);
 
     // 从文件夹/根目录索引中移除
     const folderListKey = meta.folderId 
       ? `momoimage:folder:${meta.folderId}:images` 
       : "momoimage:folder:root:images";
-    const folderImageIds = ((await kv.get(folderListKey, "json")) ?? []) as string[];
+    const folderImageIds = ((await kvGetJSON<string[]>(folderListKey)) ?? []);
     const newFolderImageIds = folderImageIds.filter((itemId) => itemId !== id);
-    await kv.put(folderListKey, JSON.stringify(newFolderImageIds));
+    await kvSet(folderListKey, newFolderImageIds);
 
     return c.json({ success: true });
   } catch (err) {
@@ -211,10 +209,9 @@ images.delete("/:id", async (c) => {
 images.put("/:id/move", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json<{ folderId?: string }>();
-  const kv = c.env.KV_META;
 
   // 获取图片元数据
-  const meta = (await kv.get(`momoimage:image:${id}`, "json")) as ImageMeta | null;
+  const meta = await kvGetJSON<ImageMeta>(`momoimage:image:${id}`);
   if (!meta) {
     return c.json({ success: false, error: "图片不存在" }, 404);
   }
@@ -232,23 +229,23 @@ images.put("/:id/move", async (c) => {
   } else {
     delete meta.folderId;
   }
-  await kv.put(`momoimage:image:${id}`, JSON.stringify(meta));
+  await kvSet(`momoimage:image:${id}`, meta);
 
   // 2. 从原存储分类索引中移除
   const oldFolderKey = oldFolderId 
     ? `momoimage:folder:${oldFolderId}:images` 
     : "momoimage:folder:root:images";
-  const oldList = ((await kv.get(oldFolderKey, "json")) ?? []) as string[];
+  const oldList = ((await kvGetJSON<string[]>(oldFolderKey)) ?? []);
   const newOldList = oldList.filter((itemId) => itemId !== id);
-  await kv.put(oldFolderKey, JSON.stringify(newOldList));
+  await kvSet(oldFolderKey, newOldList);
 
   // 3. 追加至新存储分类索引中
   const newFolderKey = newFolderId 
     ? `momoimage:folder:${newFolderId}:images` 
     : "momoimage:folder:root:images";
-  const newList = ((await kv.get(newFolderKey, "json")) ?? []) as string[];
+  const newList = ((await kvGetJSON<string[]>(newFolderKey)) ?? []);
   newList.unshift(id); // 新插入的文件放置于最前
-  await kv.put(newFolderKey, JSON.stringify(newList));
+  await kvSet(newFolderKey, newList);
 
   return c.json({ success: true, data: meta });
 });
@@ -256,7 +253,6 @@ images.put("/:id/move", async (c) => {
 /** 批量移动图片至其他文件夹 */
 images.post("/batch/move", async (c) => {
   const { ids, folderId } = await c.req.json<{ ids: string[]; folderId?: string }>();
-  const kv = c.env.KV_META;
 
   if (!ids || !Array.isArray(ids) || ids.length === 0) {
     return c.json({ success: false, error: "请选择要移动的图片" }, 400);
@@ -269,7 +265,7 @@ images.post("/batch/move", async (c) => {
   const folderToImageIds: Record<string, string[]> = {};
 
   for (const id of ids) {
-    const meta = (await kv.get(`momoimage:image:${id}`, "json")) as ImageMeta | null;
+    const meta = await kvGetJSON<ImageMeta>(`momoimage:image:${id}`);
     if (meta) {
       metas.push(meta);
       const oldFolderId = meta.folderId || "root";
@@ -294,7 +290,7 @@ images.post("/batch/move", async (c) => {
     } else {
       delete meta.folderId;
     }
-    await kv.put(`momoimage:image:${meta.id}`, JSON.stringify(meta));
+    await kvSet(`momoimage:image:${meta.id}`, meta);
   }
 
   // 3. 从各个原文件夹索引中移除选中的 ID
@@ -305,16 +301,16 @@ images.post("/batch/move", async (c) => {
       ? "momoimage:folder:root:images"
       : `momoimage:folder:${oldFolderId}:images`;
 
-    const oldList = ((await kv.get(oldFolderKey, "json")) ?? []) as string[];
+    const oldList = ((await kvGetJSON<string[]>(oldFolderKey)) ?? []);
     const newOldList = oldList.filter((itemId) => !removeIds.includes(itemId));
-    await kv.put(oldFolderKey, JSON.stringify(newOldList));
+    await kvSet(oldFolderKey, newOldList);
   }
 
   // 4. 追加至新存储分类索引中
   const newFolderKey = targetFolderId
     ? `momoimage:folder:${targetFolderId}:images`
     : "momoimage:folder:root:images";
-  const newList = ((await kv.get(newFolderKey, "json")) ?? []) as string[];
+  const newList = ((await kvGetJSON<string[]>(newFolderKey)) ?? []);
   
   // 过滤掉原本就在目标分类中的 ID，避免重复添加
   const idsToInsert = ids.filter(id => {
@@ -323,7 +319,7 @@ images.post("/batch/move", async (c) => {
   });
 
   const newCombinedList = [...idsToInsert, ...newList.filter(id => !idsToInsert.includes(id))];
-  await kv.put(newFolderKey, JSON.stringify(newCombinedList));
+  await kvSet(newFolderKey, newCombinedList);
 
   return c.json({ success: true });
 });
@@ -331,7 +327,6 @@ images.post("/batch/move", async (c) => {
 /** 批量删除图片 */
 images.post("/batch/delete", async (c) => {
   const { ids } = await c.req.json<{ ids: string[] }>();
-  const kv = c.env.KV_META;
   const storageManager = c.get("storageManager") as StorageManager;
 
   if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -343,7 +338,7 @@ images.post("/batch/delete", async (c) => {
 
   // 1. 读取并分组
   for (const id of ids) {
-    const meta = (await kv.get(`momoimage:image:${id}`, "json")) as ImageMeta | null;
+    const meta = await kvGetJSON<ImageMeta>(`momoimage:image:${id}`);
     if (meta) {
       metas.push(meta);
       const oldFolderId = meta.folderId || "root";
@@ -381,8 +376,8 @@ images.post("/batch/delete", async (c) => {
     } catch (err) {
       console.error(`Failed to delete physical file for key ${meta.key}:`, err);
     }
-    await kv.delete(`momoimage:image:${meta.id}`);
-    await kv.delete(`momoimage:key:${meta.key}`);
+    await kvDel(`momoimage:image:${meta.id}`);
+    await kvDel(`momoimage:key:${meta.key}`);
     
     // 批量清除缩略图的 KV 路径映射关系
     if (meta.thumbnailUrl) {
@@ -390,7 +385,7 @@ images.post("/batch/delete", async (c) => {
       const thumbnailKey = lastDotIndex !== -1 
         ? `${meta.key.slice(0, lastDotIndex)}_thumb.jpg` 
         : `${meta.key}_thumb.jpg`;
-      await kv.delete(`momoimage:key:${thumbnailKey}`);
+      await kvDel(`momoimage:key:${thumbnailKey}`);
     }
   });
 
@@ -398,18 +393,18 @@ images.post("/batch/delete", async (c) => {
 
   // 3. 一次性从全局列表索引中移除
   const globalListKey = "momoimage:image:list";
-  const globalList = ((await kv.get(globalListKey, "json")) ?? []) as string[];
+  const globalList = ((await kvGetJSON<string[]>(globalListKey)) ?? []);
   const newGlobalList = globalList.filter((itemId) => !ids.includes(itemId));
-  await kv.put(globalListKey, JSON.stringify(newGlobalList));
+  await kvSet(globalListKey, newGlobalList);
 
   // 4. 一次性从各个分类索引中移除
   for (const [folderId, removeIds] of Object.entries(folderToImageIds)) {
     const folderKey = folderId === "root"
       ? "momoimage:folder:root:images"
       : `momoimage:folder:${folderId}:images`;
-    const oldList = ((await kv.get(folderKey, "json")) ?? []) as string[];
+    const oldList = ((await kvGetJSON<string[]>(folderKey)) ?? []);
     const newList = oldList.filter((itemId) => !removeIds.includes(itemId));
-    await kv.put(folderKey, JSON.stringify(newList));
+    await kvSet(folderKey, newList);
   }
 
   return c.json({ success: true });

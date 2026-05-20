@@ -1,16 +1,16 @@
 // ============================================
-// 默默图床 — 文件夹分类管理路由
+// 默默图床 — 文件夹分类管理路由 (Vercel 原生版)
 // ============================================
 
 import { Hono } from "hono";
+import { kvGetJSON, kvSet, kvDel } from "../lib/kv";
 import type { Folder, ImageMeta } from "@shared/types";
 
 const folders = new Hono<{ Bindings: Env }>();
 
 /** 列出所有文件夹 */
 folders.get("/", async (c) => {
-  const kv = c.env.KV_META;
-  const list = ((await kv.get("momoimage:folders", "json")) ?? []) as Folder[];
+  const list = ((await kvGetJSON<Folder[]>("momoimage:folders")) ?? []);
   return c.json({ success: true, data: list });
 });
 
@@ -21,11 +21,10 @@ folders.post("/", async (c) => {
     return c.json({ success: false, error: "文件夹名称不能为空" }, 400);
   }
 
-  const kv = c.env.KV_META;
   const name = body.name.trim();
 
   // 获取所有文件夹并检查重名
-  const list = ((await kv.get("momoimage:folders", "json")) ?? []) as Folder[];
+  const list = ((await kvGetJSON<Folder[]>("momoimage:folders")) ?? []);
   if (list.some((f) => f.name.toLowerCase() === name.toLowerCase())) {
     return c.json({ success: false, error: "已存在同名文件夹" }, 400);
   }
@@ -39,7 +38,7 @@ folders.post("/", async (c) => {
   };
 
   list.push(newFolder);
-  await kv.put("momoimage:folders", JSON.stringify(list));
+  await kvSet("momoimage:folders", list);
 
   return c.json({ success: true, data: newFolder });
 });
@@ -47,9 +46,8 @@ folders.post("/", async (c) => {
 /** 删除文件夹 */
 folders.delete("/:id", async (c) => {
   const id = c.req.param("id");
-  const kv = c.env.KV_META;
 
-  const list = ((await kv.get("momoimage:folders", "json")) ?? []) as Folder[];
+  const list = ((await kvGetJSON<Folder[]>("momoimage:folders")) ?? []);
   const folderExists = list.some((f) => f.id === id);
   if (!folderExists) {
     return c.json({ success: false, error: "文件夹不存在" }, 404);
@@ -57,33 +55,33 @@ folders.delete("/:id", async (c) => {
 
   // 1. 从列表中移除文件夹
   const newList = list.filter((f) => f.id !== id);
-  await kv.put("momoimage:folders", JSON.stringify(newList));
+  await kvSet("momoimage:folders", newList);
 
   // 2. 安全处理：将此文件夹下的所有图片移到根目录，防止丢失分类
   const folderImagesKey = `momoimage:folder:${id}:images`;
-  const folderImageIds = ((await kv.get(folderImagesKey, "json")) ?? []) as string[];
+  const folderImageIds = ((await kvGetJSON<string[]>(folderImagesKey)) ?? []);
 
   if (folderImageIds.length > 0) {
     // 读取根目录图片列表
     const rootImagesKey = "momoimage:folder:root:images";
-    const rootImageIds = ((await kv.get(rootImagesKey, "json")) ?? []) as string[];
+    const rootImageIds = ((await kvGetJSON<string[]>(rootImagesKey)) ?? []);
 
     // 合并图片 ID 到根目录（原文件夹内的文件插在最前）
     const newRootImageIds = [...folderImageIds, ...rootImageIds];
-    await kv.put(rootImagesKey, JSON.stringify(newRootImageIds));
+    await kvSet(rootImagesKey, newRootImageIds);
 
     // 批量更新图片元数据中的 folderId 字段为 undefined
     for (const imageId of folderImageIds) {
-      const meta = (await kv.get(`momoimage:image:${imageId}`, "json")) as ImageMeta | null;
+      const meta = await kvGetJSON<ImageMeta>(`momoimage:image:${imageId}`);
       if (meta) {
         delete meta.folderId;
-        await kv.put(`momoimage:image:${imageId}`, JSON.stringify(meta));
+        await kvSet(`momoimage:image:${imageId}`, meta);
       }
     }
   }
 
   // 3. 删除该文件夹的图片索引键
-  await kv.delete(folderImagesKey);
+  await kvDel(folderImagesKey);
 
   return c.json({ success: true });
 });

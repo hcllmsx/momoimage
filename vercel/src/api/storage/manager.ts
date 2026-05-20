@@ -1,11 +1,11 @@
 // ============================================
-// 默默图床 — 存储管理器 (Vercel 适配版)
+// 默默图床 — 存储管理器 (Vercel 原生版)
 // 统一管理多个存储后端，支持动态添加/删除
 // ============================================
 
 import type { StorageConfig, StorageType } from "@shared/types";
 import type { StorageAdapter } from "./types";
-import { R2BindingAdapter } from "./r2-binding";
+import { kvGetJSON, kvSet } from "../lib/kv";
 // S3Adapter 和 VercelBlobAdapter 使用动态导入，避免在启动时就加载
 import type { S3Adapter } from "./s3";
 import type { VercelBlobAdapter } from "./vercel-blob";
@@ -20,20 +20,14 @@ const STORAGE_CONFIG_KEY = "momoimage:storage:configs";
 export class StorageManager {
   private adapters: Map<string, StorageAdapter> = new Map();
   private configs: StorageConfig[] = [];
-  private kv: any;
   private siteUrl: string;
-  private r2Bucket: any;
   private vercelBlobToken: string | null;
 
   constructor(options: {
-    kv: any;
     siteUrl: string;
-    r2Bucket?: any;
     vercelBlobToken?: string | null;
   }) {
-    this.kv = options.kv;
     this.siteUrl = options.siteUrl;
-    this.r2Bucket = options.r2Bucket ?? null;
     this.vercelBlobToken = options.vercelBlobToken ?? null;
   }
 
@@ -43,37 +37,23 @@ export class StorageManager {
     let savedConfigs: StorageConfig[] = [];
 
     // 1. 先从 KV 读取外部配置以确定是否有默认配置
-    if (this.kv) {
-      const data = await this.kv.get(STORAGE_CONFIG_KEY, "json");
+    try {
+      const data = await kvGetJSON<StorageConfig[]>(STORAGE_CONFIG_KEY);
       if (data && Array.isArray(data)) {
-        savedConfigs = data as StorageConfig[];
+        savedConfigs = data;
         hasDefaultExternal = savedConfigs.some((c) => c.isDefault && c.enabled);
       }
+    } catch (err) {
+      console.error("[StorageManager] Failed to load saved configs from KV:", err);
     }
 
-    // 2. 如果有 R2 Binding，自动注册本账号 R2 (Cloudflare Workers)
-    if (this.r2Bucket) {
-      const localR2Config: StorageConfig = {
-        id: "local-r2",
-        name: "本地 R2 存储",
-        type: "r2-binding",
-        isDefault: !hasDefaultExternal, // 如果外部已经有默认存储，则本地存储不作为默认
-        enabled: true,
-      };
-      this.configs.push(localR2Config);
-      this.adapters.set(
-        "local-r2",
-        new R2BindingAdapter(this.r2Bucket, this.siteUrl)
-      );
-    }
-
-    // 3. 如果有 Vercel Blob Token，自动注册本账号 Vercel Blob 为本地默认存储 (Vercel)
+    // 2. 如果有 Vercel Blob Token，自动注册本账号 Vercel Blob 为本地默认存储
     if (this.vercelBlobToken) {
       const localBlobConfig: StorageConfig = {
         id: "local-blob",
         name: "本地 Vercel Blob 存储",
         type: "vercel-blob",
-        isDefault: !hasDefaultExternal && !this.r2Bucket, // 外部无默认且无 R2 绑定时默认
+        isDefault: !hasDefaultExternal,
         enabled: true,
       };
       this.configs.push(localBlobConfig);
@@ -84,7 +64,7 @@ export class StorageManager {
       );
     }
 
-    // 4. 加载外部存储适配器并保存到 configs
+    // 3. 加载外部存储适配器并保存到 configs
     for (const config of savedConfigs) {
       try {
         await this.createAdapter(config);
@@ -94,7 +74,7 @@ export class StorageManager {
       }
     }
 
-    // 5. 如果没有任何存储后端，提示警告
+    // 4. 如果没有任何存储后端，提示警告
     if (this.configs.length === 0) {
       console.warn("No storage backends configured");
     }
@@ -170,9 +150,6 @@ export class StorageManager {
     }
 
     // 不允许修改内置本地存储的类型
-    if (id === "local-r2" && updates.type && updates.type !== "r2-binding") {
-      throw new Error("Cannot change type of local R2 storage");
-    }
     if (id === "local-blob" && updates.type && updates.type !== "vercel-blob") {
       throw new Error("Cannot change type of local Vercel Blob storage");
     }
@@ -184,8 +161,8 @@ export class StorageManager {
       this.configs.forEach((c) => (c.isDefault = false));
     }
 
-    // 重建适配器
-    if (id !== "local-r2" && id !== "local-blob") {
+    // 重建适配器（内置本地存储不需要重建）
+    if (id !== "local-blob") {
       this.adapters.delete(id);
       await this.createAdapter(config);
     }
@@ -196,9 +173,6 @@ export class StorageManager {
 
   /** 删除存储后端 */
   async removeStorage(id: string): Promise<void> {
-    if (id === "local-r2") {
-      throw new Error("Cannot remove local R2 storage");
-    }
     if (id === "local-blob") {
       throw new Error("Cannot remove local Vercel Blob storage");
     }
@@ -231,10 +205,6 @@ export class StorageManager {
     let adapter: StorageAdapter;
 
     switch (config.type) {
-      case "r2-binding":
-        // R2 Binding 只能在初始化时通过环境绑定创建
-        return;
-
       case "s3": {
         if (!config.s3Config) {
           throw new Error("S3 config is required for S3 storage type");
@@ -283,11 +253,14 @@ export class StorageManager {
     this.adapters.set(config.id, adapter);
   }
 
-  /** 保存配置到 KV（排除 local-r2 和 local-blob 两个特殊内置ID） */
+  /** 保存配置到 KV（排除 local-blob 内置ID） */
   private async saveConfigs(): Promise<void> {
-    if (!this.kv) return;
-    const external = this.configs.filter((c) => c.id !== "local-r2" && c.id !== "local-blob");
-    await this.kv.put(STORAGE_CONFIG_KEY, JSON.stringify(external));
+    try {
+      const external = this.configs.filter((c) => c.id !== "local-blob");
+      await kvSet(STORAGE_CONFIG_KEY, external);
+    } catch (err) {
+      console.error("[StorageManager] Failed to save configs to KV:", err);
+    }
   }
 
   /** 脱敏配置：隐藏密钥 */

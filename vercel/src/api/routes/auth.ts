@@ -1,9 +1,10 @@
 // ============================================
-// 默默图床 — 认证路由
+// 默默图床 — 认证路由 (Vercel 原生版)
 // ============================================
 
 import { Hono } from "hono";
 import { signJwt, getJwtSecret } from "../middleware/auth";
+import { kvGet, kvGetJSON, kvSet, kvDel } from "../lib/kv";
 import type { ApiToken } from "@shared/types";
 
 const auth = new Hono<{ Bindings: Env }>();
@@ -17,7 +18,7 @@ auth.post("/login", async (c) => {
     return c.json({ success: false, error: "密码错误" }, 401);
   }
 
-  const jwtSecret = await getJwtSecret(c.env);
+  const jwtSecret = await getJwtSecret(c.env.JWT_SECRET);
   const token = await signJwt({ sub: "admin" }, jwtSecret);
 
   return c.json({
@@ -28,10 +29,8 @@ auth.post("/login", async (c) => {
 
 /** 创建 API Token */
 auth.post("/token", async (c) => {
-  const body = await c.req.json<{ name: string }>();
-  const kv = c.env.KV_META;
-
   // 生成随机 Token
+  const body = await c.req.json<{ name: string }>();
   const tokenValue = generateToken();
   const tokenId = tokenValue.slice(0, 8);
 
@@ -43,13 +42,12 @@ auth.post("/token", async (c) => {
   };
 
   // 存储 Token 数据
-  await kv.put(`momoimage:token:${tokenValue}`, JSON.stringify(tokenData));
+  await kvSet(`momoimage:token:${tokenValue}`, tokenData);
 
   // 存储 Token 列表索引
-  const tokenList = ((await kv.get("momoimage:token:list", "json")) ??
-    []) as Array<{ id: string; token: string }>;
+  const tokenList = ((await kvGetJSON<Array<{ id: string; token: string }>>("momoimage:token:list")) ?? []);
   tokenList.push({ id: tokenId, token: tokenValue });
-  await kv.put("momoimage:token:list", JSON.stringify(tokenList));
+  await kvSet("momoimage:token:list", tokenList);
 
   return c.json({
     success: true,
@@ -59,19 +57,16 @@ auth.post("/token", async (c) => {
 
 /** 列出 API Tokens */
 auth.get("/tokens", async (c) => {
-  const kv = c.env.KV_META;
-  const tokenList = ((await kv.get("momoimage:token:list", "json")) ??
-    []) as Array<{ id: string; token: string }>;
+  const tokenList = ((await kvGetJSON<Array<{ id: string; token: string }>>("momoimage:token:list")) ?? []);
 
   const tokens: ApiToken[] = [];
   for (const item of tokenList) {
-    const data = await kv.get(`momoimage:token:${item.token}`, "json");
+    const data = await kvGetJSON<ApiToken>(`momoimage:token:${item.token}`);
     if (data) {
-      const token = data as ApiToken;
       // 隐藏完整 token 值
       tokens.push({
-        ...token,
-        token: token.token.slice(0, 8) + "..." + token.token.slice(-4),
+        ...data,
+        token: data.token.slice(0, 8) + "..." + data.token.slice(-4),
       });
     }
   }
@@ -82,10 +77,8 @@ auth.get("/tokens", async (c) => {
 /** 删除 API Token */
 auth.delete("/token/:id", async (c) => {
   const id = c.req.param("id");
-  const kv = c.env.KV_META;
 
-  const tokenList = ((await kv.get("momoimage:token:list", "json")) ??
-    []) as Array<{ id: string; token: string }>;
+  const tokenList = ((await kvGetJSON<Array<{ id: string; token: string }>>("momoimage:token:list")) ?? []);
 
   const item = tokenList.find((t) => t.id === id);
   if (!item) {
@@ -93,11 +86,11 @@ auth.delete("/token/:id", async (c) => {
   }
 
   // 删除 Token 数据
-  await kv.delete(`momoimage:token:${item.token}`);
+  await kvDel(`momoimage:token:${item.token}`);
 
   // 更新列表
   const newList = tokenList.filter((t) => t.id !== id);
-  await kv.put("momoimage:token:list", JSON.stringify(newList));
+  await kvSet("momoimage:token:list", newList);
 
   return c.json({ success: true });
 });

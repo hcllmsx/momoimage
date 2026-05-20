@@ -50,7 +50,6 @@ export function getStorageTypeName(type: string, config?: any): string {
     return "S3 兼容存储";
   }
   const map: Record<string, string> = {
-    "r2-binding": "Cloudflare R2",
     "vercel-blob": "Vercel Blob",
     oracle: "甲骨文云 OCI 对象存储",
   };

@@ -1,9 +1,10 @@
 // ============================================
-// 默默图床 — 图片上传路由
+// 默默图床 — 图片上传路由 (Vercel 原生版)
 // ============================================
 
 import { Hono } from "hono";
 import type { ImageMeta, UploadResult } from "@shared/types";
+import { kvSet, kvGetJSON } from "../lib/kv";
 import { StorageManager } from "../storage/manager";
 
 type Variables = { storageManager: StorageManager };
@@ -76,9 +77,7 @@ upload.post("/", async (c) => {
       finalStorageId = defaultConfig.id;
     } else {
       const first = configs.find((c) => c.enabled);
-      finalStorageId = first 
-        ? first.id 
-        : (storageManager.getAdapter("local-blob") ? "local-blob" : "local-r2");
+      finalStorageId = first ? first.id : "local-blob";
     }
   }
 
@@ -147,17 +146,16 @@ upload.post("/", async (c) => {
       folderId: folderId || undefined,
     };
 
-    const kv = c.env.KV_META;
-    await kv.put(`momoimage:image:${id}`, JSON.stringify(meta));
-    await kv.put(`momoimage:key:${key}`, id);
+    await kvSet(`momoimage:image:${id}`, meta);
+    await kvSet(`momoimage:key:${key}`, id);
     if (hasThumbnail) {
-      await kv.put(`momoimage:key:${thumbnailKey}`, id);
+      await kvSet(`momoimage:key:${thumbnailKey}`, id);
     }
 
     // 更新图片列表索引
-    await addToImageIndex(kv, id, folderId);
+    await addToImageIndex(id, folderId);
 
-    // 生成各种格式 of 链接
+    // 生成各种格式的链接
     const imageUrl = `${siteUrl}/i/${key}`;
     const uploadResult: UploadResult = {
       id,
@@ -230,20 +228,20 @@ function formatDatePrefix(): string {
 }
 
 /** 将图片 ID 添加到索引列表 */
-async function addToImageIndex(kv: any, id: string, folderId?: string): Promise<void> {
+async function addToImageIndex(id: string, folderId?: string): Promise<void> {
   // 1. 全局索引
   const globalListKey = "momoimage:image:list";
-  const globalList = ((await kv.get(globalListKey, "json")) ?? []) as string[];
+  const globalList = ((await kvGetJSON<string[]>(globalListKey)) ?? []);
   globalList.unshift(id);
-  await kv.put(globalListKey, JSON.stringify(globalList));
+  await kvSet(globalListKey, globalList);
 
   // 2. 文件夹/分类索引
   const folderListKey = folderId 
     ? `momoimage:folder:${folderId}:images` 
     : "momoimage:folder:root:images";
-  const folderList = ((await kv.get(folderListKey, "json")) ?? []) as string[];
+  const folderList = ((await kvGetJSON<string[]>(folderListKey)) ?? []);
   folderList.unshift(id);
-  await kv.put(folderListKey, JSON.stringify(folderList));
+  await kvSet(folderListKey, folderList);
 }
 
 export default upload;

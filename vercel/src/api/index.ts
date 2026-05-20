@@ -1,5 +1,5 @@
 // ============================================
-// 默默图床 — Hono 后端入口 (Vercel 适配版)
+// 默默图床 — Hono 后端入口 (Vercel 原生版)
 // ============================================
 
 import { Hono } from "hono";
@@ -7,6 +7,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { authMiddleware } from "./middleware/auth";
 import { StorageManager } from "./storage/manager";
+import { kvGet, isKvConfigured } from "./lib/kv";
 import authRoutes from "./routes/auth";
 import uploadRoutes from "./routes/upload";
 import imageRoutes from "./routes/images";
@@ -24,7 +25,7 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 app.use("*", cors());
 app.use("*", logger());
 
-// 全局错误拦截器，拦截所有未捕获的运行时错误，统一以 JSON 响应返回，防止 Vercel 吐出 HTML 崩溃页面
+// 全局错误拦截器，拦截所有未捕获的运行时错误，统一以 JSON 响应返回
 app.onError((err, c) => {
   console.error("[Hono] Uncaught API Error:", err);
   return c.json({
@@ -44,9 +45,7 @@ function getSiteUrl(c: { env: Env; req: { url: string } }): string {
 app.use("/api/*", async (c, next) => {
   const siteUrl = getSiteUrl(c);
   const manager = new StorageManager({
-    kv: c.env.KV_META ?? null,
     siteUrl,
-    r2Bucket: c.env.R2_BUCKET ?? null,
     vercelBlobToken: c.env.BLOB_READ_WRITE_TOKEN ?? null,
   });
   await manager.initialize();
@@ -59,39 +58,29 @@ app.use("/api/*", async (c, next) => {
 // 系统信息
 app.get("/api/info", async (c) => {
   const siteUrl = getSiteUrl(c);
-  const isDefaultDomain =
-    siteUrl.includes(".workers.dev") || 
-    siteUrl.includes(".pages.dev") || 
-    siteUrl.includes(".vercel.app");
+  const isDefaultDomain = siteUrl.includes(".vercel.app");
   const isDefaultPassword = !c.env.ADMIN_PASSWORD;
 
-  // 根据是否有 Vercel Blob Token 自动切换部署平台标识
-  const deployTarget = c.env.BLOB_READ_WRITE_TOKEN ? "vercel" : "cloudflare";
-
-  // 主动诊断 KV/Redis 数据库连通性
+  // 主动诊断 Vercel KV (Upstash Redis) 连通性
   let isKvValid = false;
-  const kv = c.env.KV_META;
-  if (kv) {
+  if (isKvConfigured()) {
     try {
-      // 通过对特定保留 key 执行轻量 get，检测底层 Redis 是否正常连接（若未配置环境变量，get 会抛错）
-      await kv.get("momoimage:system:test_connection");
+      await kvGet("momoimage:system:test_connection");
       isKvValid = true;
     } catch (err) {
-      console.error("[Diagnostics] KV database connection check failed:", err);
+      console.error("[Diagnostics] Vercel KV connection check failed:", err);
     }
   }
 
-  // 诊断内置本地存储是否已配置
-  const isStorageValid = deployTarget === "vercel" 
-    ? !!c.env.BLOB_READ_WRITE_TOKEN 
-    : !!c.env.R2_BUCKET;
+  // 诊断 Vercel Blob 存储是否已配置
+  const isStorageValid = !!c.env.BLOB_READ_WRITE_TOKEN;
 
   return c.json({
     success: true,
     data: {
       siteUrl,
       hasCustomDomain: !isDefaultDomain,
-      deployTarget,
+      deployTarget: "vercel",
       version: "1.0.0",
       isDefaultPassword,
       isKvValid,
@@ -108,26 +97,21 @@ app.get("/i/*", async (c) => {
   // 图片访问路由也需要存储管理器，手动初始化
   const siteUrl = getSiteUrl(c);
   const manager = new StorageManager({
-    kv: c.env.KV_META ?? null,
     siteUrl,
-    r2Bucket: c.env.R2_BUCKET ?? null,
     vercelBlobToken: c.env.BLOB_READ_WRITE_TOKEN ?? null,
   });
   await manager.initialize();
 
-  const kv = c.env.KV_META;
   let adapter = manager.getDefault();
-  
-  // 确定默认/首选存储 ID，Vercel 下为 local-blob，Cloudflare 下为 local-r2
-  const defaultStorageId = c.env.BLOB_READ_WRITE_TOKEN ? "local-blob" : "local-r2";
-  let resolvedStorageId = manager.getConfigs().find(cfg => cfg.isDefault && cfg.enabled)?.id || defaultStorageId;
+  let resolvedStorageId = manager.getConfigs().find(cfg => cfg.isDefault && cfg.enabled)?.id || "local-blob";
 
   // 尝试通过 KV 映射关系查询该图片具体存储在哪个后端
   try {
+    const { kvGet: kvGetText, kvGetJSON: kvGetJSONLocal } = await import("./lib/kv");
     const decodedKey = decodeURIComponent(key);
-    const mappedId = await kv.get(`momoimage:key:${decodedKey}`);
+    const mappedId = await kvGetText(`momoimage:key:${decodedKey}`);
     if (mappedId) {
-      const meta = (await kv.get(`momoimage:image:${mappedId}`, "json")) as any;
+      const meta = await kvGetJSONLocal<any>(`momoimage:image:${mappedId}`);
       if (meta && meta.storageId) {
         const targetAdapter = manager.getAdapter(meta.storageId);
         if (targetAdapter) {
@@ -144,7 +128,7 @@ app.get("/i/*", async (c) => {
 
   let result = await adapter.get(decodeURIComponent(key));
   
-  // 自愈降级与自愈机制：如果从指定/默认适配器找不到图片（通常是由于老旧图片缺乏对应映射），则尝试从其他启用的存储中拉取
+  // 自愈降级与自愈机制：如果从指定/默认适配器找不到图片，则尝试从其他启用的存储中拉取
   if (!result) {
     const configs = manager.getConfigs().filter((cfg) => cfg.enabled && cfg.id !== resolvedStorageId);
     for (const config of configs) {
@@ -155,14 +139,15 @@ app.get("/i/*", async (c) => {
           if (fallbackResult) {
             result = fallbackResult;
             
-            // 自愈：在后台自动寻找匹配此 key 的图片 id，并重新注册 KV 的 key->id 映射，实现数据库自动升级自愈
+            // 自愈：在后台自动寻找匹配此 key 的图片 id，并重新注册 KV 的 key->id 映射
             const repairTask = async () => {
               try {
-                const list = ((await kv.get("momoimage:image:list", "json")) ?? []) as string[];
+                const { kvGetJSON: kvGetJSONRepair, kvSet: kvSetRepair } = await import("./lib/kv");
+                const list = ((await kvGetJSONRepair<string[]>("momoimage:image:list")) ?? []);
                 for (const imgId of list) {
-                  const meta = (await kv.get(`momoimage:image:${imgId}`, "json")) as any;
+                  const meta = await kvGetJSONRepair<any>(`momoimage:image:${imgId}`);
                   if (meta && meta.key === decodeURIComponent(key)) {
-                    await kv.put(`momoimage:key:${decodeURIComponent(key)}`, imgId);
+                    await kvSetRepair(`momoimage:key:${decodeURIComponent(key)}`, imgId);
                     console.log(`[Auto-Repair] Successfully auto-repaired legacy key mapping for ${key} -> ${imgId}`);
                     break;
                   }
@@ -172,12 +157,8 @@ app.get("/i/*", async (c) => {
               }
             };
 
-            // Vercel Serverless 环境中没有 executionCtx.waitUntil，这里做安全兼容
-            if (c.executionCtx) {
-              c.executionCtx.waitUntil(repairTask());
-            } else {
-              repairTask();
-            }
+            // Vercel Serverless 环境中没有 executionCtx.waitUntil
+            repairTask();
             break;
           }
         } catch (err) {

@@ -68,7 +68,6 @@ export function StorageConfig() {
 
   const getIcon = (type: StorageType) => {
     switch (type) {
-      case "r2-binding": return { cls: "storage-item__icon--r2", emoji: "☁️" };
       case "s3": return { cls: "storage-item__icon--s3", emoji: "📦" };
       case "vercel-blob": return { cls: "storage-item__icon--blob", emoji: "▲" };
       case "oracle": return { cls: "storage-item__icon--s3", emoji: "🍊" };
@@ -133,7 +132,7 @@ export function StorageConfig() {
                     {!config.isDefault && (
                       <button className="btn btn--ghost btn--sm" onClick={() => handleSetDefault(config)}>设为默认</button>
                     )}
-                    {config.id !== "local-r2" && config.id !== "local-blob" && (
+                    {config.id !== "local-blob" && (
                       <>
                         <button
                           className="btn btn--ghost btn--sm"

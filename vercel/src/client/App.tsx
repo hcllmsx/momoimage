@@ -271,7 +271,7 @@ export default function App() {
               <span className="domain-banner__icon">⚠️</span>
               <span>
                 当前使用的是默认域名，建议绑定自定义域名以获得更好的访问体验。
-                在 Cloudflare 控制台的 Workers 设置中添加自定义域名，并更新 SITE_URL 环境变量。
+                在 Vercel 控制台的 Domains 设置中添加自定义域名，并更新 SITE_URL 环境变量。
               </span>
               <button className="domain-banner__close" onClick={dismissDomainBanner}>
                 ✕
@@ -284,11 +284,7 @@ export default function App() {
             <div className="domain-banner" style={{ background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: "var(--radius-md)", padding: "12px 16px", color: "rgb(239, 68, 68)", display: "flex", alignItems: "center", gap: 10, fontSize: "13px", lineHeight: "1.6", marginBottom: "16px", textAlign: "left" }}>
               <span style={{ fontSize: "16px", flexShrink: 0 }}>🛑</span>
               <span style={{ flex: 1 }}>
-                {systemInfo.deployTarget === "vercel" ? (
-                  <><strong>数据库未就绪：</strong>系统未检测到可用的 Upstash for Redis (KV) 数据库。请前往 Vercel 控制台的「Storage」菜单创建或关联 Redis 数据库，并确认已为项目配置了 KV 相关的环境变量。</>
-                ) : (
-                  <><strong>数据库未就绪：</strong>系统未检测到可用的 KV_META 资源绑定，图床数据将无法持久化。请检查 wrangler.jsonc 配置文件或在 Cloudflare 控制台中为 Workers 绑定已创建的 KV 命名空间。</>
-                )}
+                <><strong>数据库未就绪：</strong>系统未检测到可用的 Upstash for Redis (KV) 数据库。请前往 Vercel 控制台的「Storage」菜单创建或关联 Redis 数据库，并确认已为项目配置了 KV 相关的环境变量。</>
               </span>
             </div>
           )}
@@ -298,11 +294,7 @@ export default function App() {
             <div className="domain-banner" style={{ background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: "var(--radius-md)", padding: "12px 16px", color: "rgb(239, 68, 68)", display: "flex", alignItems: "center", gap: 10, fontSize: "13px", lineHeight: "1.6", marginBottom: "16px", textAlign: "left" }}>
               <span style={{ fontSize: "16px", flexShrink: 0 }}>🛑</span>
               <span style={{ flex: 1 }}>
-                {systemInfo.deployTarget === "vercel" ? (
-                  <><strong>存储未绑定：</strong>系统未检测到可用的 Vercel Blob 存储绑定，本地内置上传将受阻。请前往 Vercel 控制台绑定 Blob 存储，或者在登录后前往「存储」菜单中手动添加外部兼容的对象存储后端（如 S3 / OCI）。</>
-                ) : (
-                  <><strong>存储未绑定：</strong>系统未检测到绑定的 R2_BUCKET 资源。请检查 wrangler.jsonc 配置文件或在 Cloudflare 控制台中添加 R2 桶绑定，或者在登录后前往「存储」菜单手动配置外部对象存储。</>
-                )}
+                <><strong>存储未绑定：</strong>系统未检测到可用的 Vercel Blob 存储绑定，本地内置上传将受阻。请前往 Vercel 控制台绑定 Blob 存储，或者在登录后前往「存储」菜单中手动添加外部兼容的对象存储后端（如 S3 / OCI）。</>
               </span>
             </div>
           )}
