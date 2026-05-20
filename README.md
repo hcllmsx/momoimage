@@ -1,249 +1,107 @@
 # 默默图床 (MomoImage) 📸
 
-默默图床是一个专为 Cloudflare 平台设计的高性能、现代化全栈图片托管系统。它采用极速轻量的 Fullstack（全栈）架构，提供开箱即用的高性能图片代理、多存储后端动态管理以及完备的安全认证。
-
-> [!TIP]
-> 默默图床通过将前端 SPA 静态资源与 Hono 后端 API 融为一体，并借助 Cloudflare R2 与 KV 提供了近乎零延迟、无限容量且极其廉价的图床方案。
+默默图床是一个现代化、全栈图片托管系统。项目提供 **Cloudflare** 与 **Vercel** 两套完全独立的部署方案，全量支持虚拟分类、強缓存直链、多存储后端管理以及 API 开放上传。
 
 ---
 
-## 🎨 架构设计
+## 🛠️ 1. Cloudflare 版本部署步骤
 
-默默图床的系统架构如下所示：
+Cloudflare 版代码管理在 `cloudflare/` 目录下。
 
-```mermaid
-graph TD
-    Client[客户端/浏览器] -->|1. 访问站点 / SPA 路由| Worker[Cloudflare Workers / Assets]
-    Client -->|2. 图片上传 / 管理请求| Hono[Hono Web 框架]
-    Client -->|3. 开放 API 上传| Hono
-    
-    Hono -->|JWT/API Token 校验| Middleware[认证中间件 authMiddleware]
-    Hono -->|代理图片请求 /i/* 强缓存| StorageManager[存储管理器 StorageManager]
-    
-    StorageManager -->|自动加载/读写| KV[(Cloudflare KV)]
-    StorageManager -->|原生绑定方式| R2Adapter[R2 Binding 适配器]
-    StorageManager -->|S3 协议兼容| S3Adapter[S3 适配器]
-    StorageManager -->|HTTP REST 交互| VercelBlobAdapter[Vercel Blob 适配器]
-    
-    R2Adapter -->|数据流| CF_R2[(Cloudflare R2 存储桶)]
-    S3Adapter -->|AWS/MinIO/腾讯云/阿里云| S3_Cloud[(S3 兼容存储)]
-    VercelBlobAdapter -->|Vercel 存储| VC_Blob[(Vercel Blob)]
-```
+### 本地部署与开发预览
+本地联调开发有两种方式：
 
----
+* **方式 A：纯预览/日常使用（单端口）**
+  1. 进入 `cloudflare` 目录安装依赖：
+     ```bash
+     npm install
+     ```
+  2. 启动本地 Wrangler 模拟环境：
+     ```bash
+     npx wrangler dev
+     ```
+  3. 直接在浏览器打开控制台输出的端口地址（通常为 `http://localhost:8787`）即可。系统会自动托管打包好的静态前端页面与本地模拟 KV/R2。
 
-## 🚀 核心特性
-
-### 1. ⚡ 极速全栈架构
-* **前端**：基于 **React 19** + **Vite 6** + **TypeScript** 驱动，采用精心设计的 CSS 提供沉浸式的高级深色/浅色交互体验。
-* **后端**：基于 **Hono 4** 框架，部署于 **Cloudflare Workers** (支持 Wrangler Assets 静态资源挂载)。具备冷启动接近 0ms 的超凡响应速度。
-
-### 2. 💾 统一的多存储后端适配 (Multi-Adapter Storage)
-默默图床通过统一的 `StorageAdapter` 接口，支持多种主流对象存储，可在后台动态增加、删除、测试连接和一键设置默认值：
-* **本地 R2 存储 (`r2-binding`)**：直接绑定本账号下的 Cloudflare R2 存储桶，速度最快、零延迟、零额外认证，是默认首选。
-* **S3 兼容存储 (`s3`)**：支持通过 S3 协议访问任何 S3 兼容的对象存储（例如外部 Cloudflare R2 账号、AWS S3、MinIO 等），支持配置自定义 CDN 加速域名 (`publicUrl`)。
-* **Vercel Blob 存储 (`vercel-blob`)**：支持使用纯 HTTP REST 方式与 Vercel Blob 交互（不引入官方 SDK），提供轻量、快速的高性价比第三方存储选择。
-
-### 3. 🛡️ 双重认证安全体系
-* **管理后台 JWT 认证**：后台登录生成 JWT 会话 Token，支持设置 `ADMIN_PASSWORD` 与 `JWT_SECRET`。若没有配置 `JWT_SECRET`，系统将自动生成强随机密钥并安全持久化到 Cloudflare KV。
-* **开放 API Token 认证**：在管理端可生成与管理多个具有独立名称备注的 API 密钥，可实现程序化（如 ShareX、PicGo 等客户端）图片上传。客户端上传时，通过在 Header 携带 `Authorization: Token <api-token>` 即可进行安全调用。
-
-### 4. 🔀 SPA 静态路由与本域图片强缓存代理
-* **智能 SPA 回退代理**：Hono 路由通过 `c.env.ASSETS` 拦截所有未知静态资产，如果在 API 与图片访问路由之外遇到 404，会自动重定向回 `/index.html` 触发前端 SPA 路由，保证单页应用路由跳转体验。
-* **1 年有效期强缓存**：图片统一通过图床本域 `/i/*` 进行本域代理访问。接口会自动从实际物理存储端拉取图片流并以强缓存头（`Cache-Control: public, max-age=31536000, immutable`）响应浏览器，极大节约对象存储下行流量及网络开销。
-
-### 5. ✨ 人性化的前端交互与引导
-* **多功能上传区**：支持多图并行上传、**拖拽上传**、**剪切板粘贴上传**，带有独立的上传进度条、成功打勾与失败报错提示。
-* **快捷链接分享**：图片上传成功或点击图库复制时，提供弹窗一键复制 **Direct URL**、**Markdown**、**HTML**、**BBCode** 各种图片引用格式。
-* **初始化引导与检测**：
-  * **零配置引导页**：若未在 Cloudflare 环境变量中配置 `ADMIN_PASSWORD`，系统亦能正常运行并渲染一个美轮美奂的「初始化引导步骤」页面，引导开发者去 Cloudflare 控制台添加变量。
-  * **自定义域名检测**：若图床运行在 Workers 默认的 `*.workers.dev` 或 `*.pages.dev` 下，首页会自动展示 Banner 友好提醒，建议绑定自定义域名以保障访问速度与规避防跨域限制。
+* **方式 B：前端开发热更新（双端口，推荐在需要修改前端代码时使用）**
+  1. 终端 1 启动后端 Worker 服务（监听 8787 端口）：
+     ```bash
+     npx wrangler dev
+     ```
+  2. 终端 2 启动前端 Vite 调试服务器（监听 5173 端口）：
+     ```bash
+     npm run dev
+     ```
+  3. 浏览器访问 `http://localhost:5173`。Vite 会自动将 `/api` 的接口请求代理至 `8787` 后端。
 
 ---
 
-## 🛠️ 技术栈
-
-* **核心框架**：[Hono v4](https://hono.dev/)
-* **前端开发**：[React 19](https://react.dev/) + [Vite v6](https://vite.dev/) + TypeScript
-* **对象存储 SDK**：`@aws-sdk/client-s3` (动态按需导入，优化首包体积)
-* **部署平台**：Cloudflare Workers / Assets
-* **持久化存储**：Cloudflare KV (元数据及配置) + Cloudflare R2 (物理图片)
-
----
-
-## ⚙️ 部署与配置指南
-
-### 1. 准备 Cloudflare 资源
-
-部署前需在 Cloudflare 控制台创建以下资源：
-1. **R2 存储桶**：创建一个名为 `momoimage` 的 R2 存储桶。
-2. **KV 命名空间**：创建一个 KV 命名空间（用于存储图床配置和图片索引）。
-
-### 2. 本地配置文件修改
-
-打开 `cloudflare` 目录下的 `wrangler.jsonc` 文件，修改对应的资源绑定：
-
-```jsonc
-{
-  "name": "momoimage",
-  "main": "./src/api/index.ts",
-  "compatibility_date": "2025-04-01",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
-  "assets": {
-    "directory": "./dist"
-  },
-  "r2_buckets": [
-    {
-      "binding": "R2_BUCKET",
-      "bucket_name": "momoimage" // 替换为你的 R2 存储桶名称
-    }
-  ],
-  "kv_namespaces": [
-    {
-      "binding": "KV_META",
-      "id": "你的KV命名空间ID" // 替换为你在 Cloudflare 创建的 KV ID
-    }
-  ]
-}
-```
-
-### 3. 配置管理员密码与会话管理 (可选)
-
-系统完全支持开箱即用，无缝免配置：
-* **默认密码**：若不进行任何设置，默认管理员登录密码为 **`momoimage`**。
-* **配置自定义密码**：如果您需要保障图床安全，建议在 Cloudflare 控制台 -> 你的 Worker 实例 -> **设置 (Settings)** -> **变量和机密 (Variables)** 中点击「添加变量」，名称填写 `ADMIN_PASSWORD`，值填入您心仪的密码，类型选择 **机密 (Secret)**，保存并重新部署即可。
-* **会话与下线管理 (`JWT_SECRET`)**：
-  * **会话缓存机制**：登录成功后，系统会为浏览器颁发一个有效期为 7 天的 JWT Token，后续操作均通过 Token 进行数字签名校验。即使您中途修改或删除了 `ADMIN_PASSWORD` 环境变量，已经登录的浏览器在 Token 尚未过期的 7 天内依然处于有效登录状态。
-  * **强制全球断开 / 立即下线**：若您修改密码后希望**立刻断开所有已登录设备的连接**，可在 Cloudflare 环境变量中添加/更换 **`JWT_SECRET`**（建议填写一串长随机字符串），或者直接前往您的 **Cloudflare KV 控制台，将命名空间下的 `momoimage:system:jwt_secret` 这个键（Key）删除**。系统重新生成新密钥后，旧客户端的 Token 将立刻集体失效，强制退回登录页面。
-
-### 4. 构建与部署
-
-项目提供了极简的一键部署指令：
-
-```bash
-# 1. 安装项目依赖
-npm install
-
-# 2. 本地开发预览
-npm run dev
-
-# 3. 编译前端静态资源，并将项目部署到 Cloudflare Worker (Wrangler Assets)
-npm run deploy
-```
+### 线上发布部署
+1. **创建云端资源**：
+   * 登录 Cloudflare 控制台，进入 **R2 对象存储**，创建一个名为 `momoimage` 的存储桶。
+   * 进入 **KV** 页面，创建一个 KV 命名空间（例如命名为 `momoimage-kv`）。
+2. **修改本地配置**：
+   * 打开 `cloudflare/wrangler.jsonc`，将 `R2_BUCKET` 绑定的 `bucket_name` 填入您的存储桶名称，将 `KV_META` 的 `id` 替换为你在 Cloudflare 上创建的 KV 命名空间 ID。
+3. **配置业务密码**：
+   * 在 Cloudflare Worker 项目的 **设置 -> 变量和机密** 中，添加变：`ADMIN_PASSWORD`（默认密码为 `momoimage`）
+4. **编译与发布**：
+   * 在 `cloudflare` 目录下执行命令一键部署：
+     ```bash
+     npm run deploy
+     ```
+   * 或者直接在 Cloudflare 控制台连接您的 GitHub 仓库进行持续集成。
 
 ---
 
-## 📋 API 接口说明
+## 🔺 2. Vercel 版本部署步骤
 
-系统内置了详尽的后端接口，认证机制支持 `Authorization: Bearer <jwt>` 与 `Authorization: Token <api-token>`。
+Vercel 版代码管理在 `vercel/` 目录下。
 
-### 🔓 公开接口 (无需认证)
-
-#### 1. 系统信息获取
-* **请求方式**：`GET`
-* **路由**：`/api/info`
-* **返回格式**：
-  ```json
-  {
-    "success": true,
-    "data": {
-      "siteUrl": "https://img.example.com",
-      "hasCustomDomain": true,
-      "deployTarget": "cloudflare",
-      "version": "1.0.0",
-      "needSetup": false
-    }
-  }
-  ```
-
-#### 2. 图片访问 (直链)
-* **请求方式**：`GET`
-* **路由**：`/i/:key`
-* **说明**：支持长达 1 年的浏览器强缓存，自动支持中文字符与子目录路径。
-
-#### 3. 后台管理员登录
-* **请求方式**：`POST`
-* **路由**：`/api/auth/login`
-* **参数**：`{ "password": "your_password" }`
-* **返回**：`{ "success": true, "data": { "token": "JWT_TOKEN" } }`
+### 本地部署与开发预览
+1. 全局安装 Vercel CLI 工具：
+   ```bash
+   npm install -g vercel
+   ```
+2. 进入 `vercel` 目录安装依赖：
+   ```bash
+   npm install
+   ```
+3. 关联项目并启动本地 Serverless 仿真环境：
+   ```bash
+   vercel dev
+   ```
+   *注意：`vercel dev` 本地调试时，会从您绑定的云端拉取环境变量与存储连接信息。本地上传和读写数据会实时作用于您绑定的真实 Vercel KV 和 Vercel Blob。*
 
 ---
 
-### 🔒 受保护接口 (需要 Bearer/Token 认证)
+### 线上发布部署（最佳实践）
 
-所有受保护接口需要在 Header 中加入认证凭证：
-* 管理员后台：`Authorization: Bearer <JWT_TOKEN>`
-* 外部编程接口：`Authorization: Token <API_TOKEN>`
-
-#### 1. 上传图片
-* **请求方式**：`POST`
-* **路由**：`/api/upload`
-* **Query 参数**：
-  * `storage`: `storage_id` (可选，不传则使用后台默认存储)
-  * `folderId`: `folder_id` (可选，上传到指定的虚拟分类文件夹，不传或为空则上传到根目录)
-* **Body 格式**：`multipart/form-data`
-  * `file`: 图片文件 (支持 JPEG, PNG, WebP, GIF, SVG 等，最大 20MB)
-  * `folderId`: `folder_id` (可选，亦可通过 Body 传递分类文件夹 ID)
-* **响应结果**：
-  ```json
-  {
-    "success": true,
-    "data": {
-      "id": "12位唯一短ID",
-      "url": "https://img.example.com/i/2026/05/abc123_pic.png",
-      "originalName": "pic.png",
-      "size": 102400,
-      "mimeType": "image/png",
-      "folderId": "folder-xxx",
-      "links": {
-        "url": "https://img.example.com/i/2026/05/abc123_pic.png",
-        "markdown": "![pic.png](https://img.example.com/i/2026/05/abc123_pic.png)",
-        "html": "<img src=\"https://img.example.com/i/2026/05/abc123_pic.png\" alt=\"pic.png\" />",
-        "bbcode": "[img]https://img.example.com/i/2026/05/abc123_pic.png[/img]"
-      }
-    }
-  }
-  ```
-
-#### 2. 程序化上传脚本示例 (curl)
-你可以配合 ShareX、PicGo 或本地 Shell 脚本，一键实现终端快速上传图片（亦支持携带 `folderId` 选定分类）：
-
-```bash
-curl -X POST \
-  -H "Authorization: Token your_api_token" \
-  -F "file=@/path/to/your/image.png" \
-  -F "folderId=your_folder_id" \
-  https://img.example.com/api/upload
-```
-
-#### 3. 图片库管理
-* **获取图片列表 (分页)**：`GET /api/images?page=1&pageSize=20&folderId=folder_id`
-  * `folderId`: (可选) 可传入特定文件夹 ID，传入 `"root"` 或不传代表根目录，传入 `"all"` 获取全部图片。
-* **获取图片详情**：`GET /api/images/:id`
-* **移动图片分类**：`PUT /api/images/:id/move` (Body: `{ "folderId": "新的分类ID或空值" }`)
-* **物理/元数据删除**：`DELETE /api/images/:id` (自动从对应的物理存储端进行真实删除，并同步清理所有全局与文件夹 KV 索引)
-
-#### 4. 外部存储后端管理
-* **列出所有存储配置**：`GET /api/storage` (已自动对 `secretAccessKey` / `token` 等敏感参数进行掩码脱敏)
-* **新增外部存储**：`POST /api/storage`
-* **修改存储配置**：`PUT /api/storage/:id`
-* **删除存储配置**：`DELETE /api/storage/:id`
-* **测试连接性**：`POST /api/storage/:id/test` (通过列出一条测试文件来实时验证连接密钥和可用性)
-
-#### 5. 虚拟分类文件夹管理
-* **列出所有分类文件夹**：`GET /api/folders`
-* **创建新分类文件夹**：`POST /api/folders` (Body: `{ "name": "新文件夹名称" }`)
-* **删除分类文件夹**：`DELETE /api/folders/:id` (安全解散分类：不会删除里面的物理图片，图片将被自动转移并合并到根目录下)
-
-#### 6. API 开放令牌管理
-* **列出 API 令牌**：`GET /api/auth/tokens`
-* **创建新 API 令牌**：`POST /api/auth/token` (Body: `{ "name": "备注名" }`)
-* **注销 API 令牌**：`DELETE /api/auth/token/:id`
+1. **导入项目**：
+   * 登录 Vercel 控制台，点击 **"Add New" -> "Project"**，导入您的 GitHub 代码仓库。
+   * **Root Directory** 必须选中并填写 **`vercel`** 目录，其他构建命令保持默认，点击 **Deploy** 完成初次部署（初次部署会因缺少变量而暂时无法运行，属正常现象）。
+2. **创建并绑定 Vercel KV（存储数据库）**：
+   * 进入刚刚创建的项目面板（Project Dashboard），点击顶部导航栏的 **"Storage"** 标签页。
+   * 在列表中选择 **"KV"** (或 **"KV (Redis)"**)，点击 **"Create"**，阅读条款后点击 **"Create New"** 并选择 **Connect**（连接）到该项目。
+3. **创建并绑定 Vercel Blob（对象存储）**：
+   * 同样在 **"Storage"** 页面，选择 **"Blob"**，点击 **"Create"**，确认后将其 **Connect**（连接）到该项目。（Vercel 将自动激活本地 `local-blob` 零配置对象存储）。
+4. **手动添加业务环境变量**：
+   * 进入项目 **"Settings" -> "Environment Variables"**，手动添加环境变量：`ADMIN_PASSWORD`（管理员登录密码）。
+5. **触发 Redeploy**：
+   * 回到项目 **"Deployments"** 页面，点击最近一次部署右侧的三个小点，选择 **"Redeploy"**。重新打包完成后，项目即完美上线。
 
 ---
 
-## 🔒 许可
+## 🔒 3. 核心环境变量对照表
 
-基于 MIT 协议开源。你可以自由分发、修改和在闭源商业项目中使用。
+无论部署在哪个平台，请根据需求在控制面板的环境变量设置中提供以下核心变量：
+
+| 变量键名 | 是否必填 | 默认回退值 | 作用说明 |
+| :--- | :--- | :--- | :--- |
+| `ADMIN_PASSWORD` | **推荐** | `momoimage` | 后台管理登录密码，如果不配置，网页端会展示引导设置 Banner。 |
+| `JWT_SECRET` | 可选 | KV 自动生成并安全持久化 | 生成 JWT 用户会话的签名密钥。更改或删除此密钥会使所有已登录设备强制立即下线。 |
+| `SITE_URL` | 可选 | 当前请求的 Host 推导 | 图床的公共访问主域，强烈推荐配置以保障图片代理直链地址 100% 对齐。 |
+
+---
+
+## ⚖️ 许可
+
+MIT License.
