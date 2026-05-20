@@ -56,7 +56,7 @@ export function LoginForm({
               marginBottom: 18,
               lineHeight: 1.6,
             }}>
-              💡 <strong>提示：</strong>当前系统未设置自定义密码，已启用默认登录密码：<code style={{ background: "var(--color-bg-surface)", padding: "2px 6px", borderRadius: 4, fontFamily: "monospace", fontWeight: "bold" }}>momoimage</code>。为了安全，建议部署后到 Cloudflare 控制台的「设置 → 变量和机密」中配置自定义 <code>ADMIN_PASSWORD</code>。
+              💡 <strong>提示：</strong>当前系统未设置自定义密码，已启用默认登录密码：<code style={{ background: "var(--color-bg-surface)", padding: "2px 6px", borderRadius: 4, fontFamily: "monospace", fontWeight: "bold" }}>momoimage</code>。为了安全，建议部署后到 Vercel 控制台的「Settings → Environment Variables」中配置自定义 <code>ADMIN_PASSWORD</code>。
             </div>
           )}
 

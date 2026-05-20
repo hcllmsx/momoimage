@@ -18,17 +18,27 @@ export async function getJwtSecret(env: Env): Promise<string> {
   const kvKey = "momoimage:system:jwt_secret";
   const kv = env.KV_META;
   if (kv) {
-    const saved = await kv.get(kvKey);
-    if (saved) return saved;
+    try {
+      const saved = await kv.get(kvKey);
+      if (saved) return saved;
 
-    // 3. 首次使用，自动生成并保存
-    const bytes = new Uint8Array(48);
-    crypto.getRandomValues(bytes);
-    const secret = Array.from(bytes)
-      .map((b) => b.toString(36).padStart(2, "0"))
-      .join("");
-    await kv.put(kvKey, secret);
-    return secret;
+      // 3. 首次使用，自动生成并保存
+      const bytes = new Uint8Array(48);
+      crypto.getRandomValues(bytes);
+      const secret = Array.from(bytes)
+        .map((b) => b.toString(36).padStart(2, "0"))
+        .join("");
+      
+      try {
+        await kv.put(kvKey, secret);
+      } catch (putErr) {
+        console.error("[VercelKV] Failed to save auto-generated JWT secret to KV:", putErr);
+        // 保存失败时不中断执行，继续返回此生成的临时密钥（对本次进程有效），防止彻底崩溃
+      }
+      return secret;
+    } catch (getErr) {
+      console.error("[VercelKV] Failed to read JWT secret from KV:", getErr);
+    }
   }
 
   // 实在没有 KV 也没有环境变量，用一个固定备用值（不安全，仅用于防崩溃）

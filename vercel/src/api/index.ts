@@ -24,6 +24,15 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 app.use("*", cors());
 app.use("*", logger());
 
+// 全局错误拦截器，拦截所有未捕获的运行时错误，统一以 JSON 响应返回，防止 Vercel 吐出 HTML 崩溃页面
+app.onError((err, c) => {
+  console.error("[Hono] Uncaught API Error:", err);
+  return c.json({
+    success: false,
+    error: err.message || "服务器内部错误",
+  }, 500);
+});
+
 // 从请求中获取站点 URL（如果环境变量未设置，则自动检测）
 function getSiteUrl(c: { env: Env; req: { url: string } }): string {
   if (c.env.SITE_URL) return c.env.SITE_URL.replace(/\/$/, "");
