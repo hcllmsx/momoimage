@@ -110,7 +110,11 @@ export function UploadZone({
   const [storages, setStorages] = useState<StorageConfigType[]>([]);
   const [selectedStorageId, setSelectedStorageId] = useState<string>("");
 
-  // 获取全部文件夹和已启用存储列表
+  // 新建分类文件夹弹窗状态
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+
+  // 获取全部文件夹 and 已启用存储列表
   useEffect(() => {
     api.getFolders().then(setFolders).catch(console.error);
     
@@ -127,25 +131,26 @@ export function UploadZone({
     }).catch(console.error);
   }, []);
 
-  const handleFolderChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleFolderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     if (value === "__create_new__") {
-      const name = prompt("请输入新文件夹的名称：");
-      if (!name || !name.trim()) {
-        setSelectedFolderId(""); // 重置为根目录
-        return;
-      }
-      try {
-        const newFolder = await api.createFolder(name.trim());
-        setFolders((prev) => [...prev, newFolder]);
-        setSelectedFolderId(newFolder.id);
-        showToast(`文件夹 "${name.trim()}" 创建成功`, "success");
-      } catch (err) {
-        showToast(err instanceof Error ? err.message : "创建失败", "error");
-        setSelectedFolderId("");
-      }
+      setNewFolderName("");
+      setIsCreatingFolder(true);
     } else {
       setSelectedFolderId(value);
+    }
+  };
+
+  const handleConfirmCreateFolder = async () => {
+    if (!newFolderName || !newFolderName.trim()) return;
+    try {
+      const newFolder = await api.createFolder(newFolderName.trim());
+      setFolders((prev) => [...prev, newFolder]);
+      setSelectedFolderId(newFolder.id);
+      setIsCreatingFolder(false);
+      showToast(`文件夹 "${newFolderName.trim()}" 创建成功`, "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "创建失败", "error");
     }
   };
 
@@ -526,6 +531,76 @@ export function UploadZone({
             >
               清除全部
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 新建分类文件夹弹窗 */}
+      {isCreatingFolder && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1001,
+          backdropFilter: "blur(4px)",
+        }} onClick={() => setIsCreatingFolder(false)}>
+          <div className="card" style={{
+            width: "100%",
+            maxWidth: 360,
+            padding: 24,
+            background: "var(--color-bg-surface)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--color-border)",
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.4)",
+          }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>📁</span> 新建分类文件夹
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <input
+                type="text"
+                className="input"
+                placeholder="请输入分类名称"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleConfirmCreateFolder();
+                }}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--color-border)",
+                  background: "var(--color-bg-input)",
+                  color: "var(--color-text)",
+                  width: "100%",
+                  outline: "none",
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => setIsCreatingFolder(false)}
+                style={{ padding: "6px 16px" }}
+              >
+                取消
+              </button>
+              <button
+                className="btn btn--primary btn--sm"
+                onClick={handleConfirmCreateFolder}
+                disabled={!newFolderName || !newFolderName.trim()}
+                style={{ padding: "6px 16px" }}
+              >
+                确定
+              </button>
+            </div>
           </div>
         </div>
       )}

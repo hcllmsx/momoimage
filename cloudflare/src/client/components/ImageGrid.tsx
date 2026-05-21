@@ -42,6 +42,11 @@ export function ImageGrid({
   const [movingImageId, setMovingImageId] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<ImageMeta | null>(null);
 
+  // 弹窗状态
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+
   // 批量操作相关的状态
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -55,11 +60,17 @@ export function ImageGrid({
     showToast(ok ? "链接已复制" : "复制失败", ok ? "success" : "error");
   };
 
-  const handleCreateFolderClick = async () => {
-    const name = prompt("请输入新分类文件夹的名称：");
-    if (!name || !name.trim()) return;
+  const handleCreateFolderClick = () => {
+    setNewFolderName("");
+    setIsCreatingFolder(true);
+  };
+
+  const handleConfirmCreateFolder = async () => {
+    if (!newFolderName || !newFolderName.trim()) return;
     try {
-      await onCreateFolder(name.trim());
+      await onCreateFolder(newFolderName.trim());
+      setIsCreatingFolder(false);
+      showToast(`分类文件夹 "${newFolderName.trim()}" 创建成功`, "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "创建失败", "error");
     }
@@ -132,30 +143,35 @@ export function ImageGrid({
     showToast(ok ? `已成功复制 ${selectedImages.length} 张图片的直链` : "复制失败", ok ? "success" : "error");
   };
 
-  const handleBatchDeleteClick = async () => {
+  const handleBatchDeleteClick = () => {
     if (selectedIds.length === 0) return;
-    if (confirm(`确定要删除选中的 ${selectedIds.length} 张图片吗？此操作无法恢复！`)) {
-      try {
-        setIsBatchOperating(true);
-        await onDeleteMultiple(selectedIds);
-        setSelectedIds([]);
-        setIsMultiSelectMode(false);
-      } catch (err) {
-        showToast(err instanceof Error ? err.message : "批量删除失败", "error");
-      } finally {
-        setIsBatchOperating(false);
-      }
+    setIsBatchDeleting(true);
+  };
+
+  const handleConfirmBatchDelete = async () => {
+    try {
+      setIsBatchDeleting(false);
+      setIsBatchOperating(true);
+      await onDeleteMultiple(selectedIds);
+      setSelectedIds([]);
+      setIsMultiSelectMode(false);
+      showToast("所选图片已成功批量删除", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "批量删除失败", "error");
+    } finally {
+      setIsBatchOperating(false);
     }
   };
 
   const handleConfirmBatchMove = async (folderId: string | null) => {
     if (selectedIds.length === 0) return;
+    setIsBatchMoving(false); // 立即关闭移动分类弹窗，让加载动画无遮挡展示
     try {
       setIsBatchOperating(true);
       await onMoveMultiple(selectedIds, folderId);
-      setIsBatchMoving(false);
       setSelectedIds([]);
       setIsMultiSelectMode(false);
+      showToast("所选图片已成功批量移动分类", "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "批量分类失败", "error");
     } finally {
@@ -526,7 +542,7 @@ export function ImageGrid({
           flexDirection: "column",
           alignItems: "center",
           gap: 12,
-          zIndex: 1000,
+          zIndex: 2000,
           pointerEvents: "none", // 允许鼠标事件穿透非交互区域
         }}>
           {/* 批量操作加载动画，显示在操作栏正上方 */}
@@ -767,6 +783,126 @@ export function ImageGrid({
               animation: "scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
             }}
           />
+        </div>
+      )}
+      {/* 新建分类文件夹弹窗 */}
+      {isCreatingFolder && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1001,
+          backdropFilter: "blur(4px)",
+        }} onClick={() => setIsCreatingFolder(false)}>
+          <div className="card" style={{
+            width: "100%",
+            maxWidth: 360,
+            padding: 24,
+            background: "var(--color-bg-surface)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--color-border)",
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.4)",
+          }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>📁</span> 新建分类文件夹
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <input
+                type="text"
+                className="input"
+                placeholder="请输入分类名称"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleConfirmCreateFolder();
+                }}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--color-border)",
+                  background: "var(--color-bg-input)",
+                  color: "var(--color-text)",
+                  width: "100%",
+                  outline: "none",
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => setIsCreatingFolder(false)}
+                style={{ padding: "6px 16px" }}
+              >
+                取消
+              </button>
+              <button
+                className="btn btn--primary btn--sm"
+                onClick={handleConfirmCreateFolder}
+                disabled={!newFolderName || !newFolderName.trim()}
+                style={{ padding: "6px 16px" }}
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 批量删除确认弹窗 */}
+      {isBatchDeleting && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1001,
+          backdropFilter: "blur(4px)",
+        }} onClick={() => setIsBatchDeleting(false)}>
+          <div className="card" style={{
+            width: "100%",
+            maxWidth: 380,
+            padding: 24,
+            background: "var(--color-bg-surface)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--color-border)",
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.4)",
+          }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--color-danger)" }}>
+              <span>⚠️</span> 确认批量删除
+            </h3>
+            <p style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.5, margin: 0 }}>
+              确定要删除选中的 <strong>{selectedIds.length}</strong> 张图片吗？<br />
+              此操作将物理删除云端存储中的图片，<strong>无法恢复！</strong>
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 24 }}>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => setIsBatchDeleting(false)}
+                style={{ padding: "6px 16px" }}
+              >
+                取消
+              </button>
+              <button
+                className="btn btn--danger btn--sm"
+                onClick={handleConfirmBatchDelete}
+                style={{ padding: "6px 16px" }}
+              >
+                确认删除
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
