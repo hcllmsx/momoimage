@@ -80,7 +80,7 @@ Vercel 版代码管理在 `vercel/` 目录下。
    * **Root Directory** 必须选中并填写 **`vercel`** 目录，其他构建命令保持默认，点击 **Deploy** 完成初次部署（初次部署会因缺少变量而暂时无法运行，属正常现象）。
 2. **创建并绑定 Vercel KV（存储数据库）**：
    * 进入刚刚创建的项目面板（Project Dashboard），点击顶部导航栏的 **"Storage"** 标签页。
-   * 在列表中选择 **"KV"** (或 **"KV (Redis)"**)，点击 **"Create"**，阅读条款后点击 **"Create New"** 并选择 **Connect**（连接）到该项目。
+   * 在列表中选择 **Upstash** ，然后选择 **Upstash for Redis**，创建后选择 **Connect**（连接）到该项目。
 3. **创建并绑定 Vercel Blob（对象存储）**：
    * 同样在 **"Storage"** 页面，选择 **"Blob"**，点击 **"Create"**，确认后将其 **Connect**（连接）到该项目。（Vercel 将自动激活本地 `local-blob` 零配置对象存储）。
 4. **手动添加业务环境变量**：
