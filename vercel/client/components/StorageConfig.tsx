@@ -434,104 +434,106 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
             </div>
           </>
         )}
-        <div>
-          <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>空间限额预警（可选）</label>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              type="number"
-              className="input"
-              placeholder="留空则不开启预警，例如：5"
-              value={warningThresholdValue}
-              onChange={(e) => {
-                const val = e.target.value;
-                setWarningThresholdValue(val === "" ? "" : Number(val));
-              }}
-              style={{ flex: 1 }}
-              min="1"
-            />
-            <select
-              className="input"
-              value={warningThresholdUnit}
-              onChange={(e) => setWarningThresholdUnit(e.target.value as "MB" | "GB")}
-              style={{ width: 100 }}
-            >
-              <option value="MB">MB</option>
-              <option value="GB">GB</option>
-            </select>
-          </div>
-          <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
-            💡 设置后，当该存储的已用容量接近或超过此限额时，将在图片上传页面进行友好提示。
-          </div>
-        </div>
-
-        <div>
-          <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>存储标签颜色（可选）</label>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            {[
-              { hex: "#3B82F6", name: "蓝色" },
-              { hex: "#10B981", name: "绿色" },
-              { hex: "#8B5CF6", name: "紫色" },
-              { hex: "#F59E0B", name: "橙色" },
-              { hex: "#EF4444", name: "红色" },
-              { hex: "#EC4899", name: "粉色" },
-              { hex: "#6B7280", name: "灰色" }
-            ].map((preset) => {
-              const isSelected = color === preset.hex;
-              return (
-                <button
-                  key={preset.hex}
-                  type="button"
-                  onClick={() => setColor(preset.hex)}
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: "50%",
-                    backgroundColor: preset.hex,
-                    border: isSelected ? "2px solid var(--color-text-primary)" : "2px solid transparent",
-                    boxShadow: isSelected ? "0 0 0 2px var(--color-bg-base)" : "none",
-                    cursor: "pointer",
-                    transform: isSelected ? "scale(1.15)" : "scale(1)",
-                    transition: "transform 0.2s, border-color 0.2s",
-                    padding: 0,
-                  }}
-                  title={preset.name}
-                />
-              );
-            })}
-
-            {/* 自定义颜色选择器 */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
-              <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>自定义:</span>
-              <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                overflow: "hidden",
-                border: "1px solid var(--color-border)",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "var(--color-bg-input)",
-              }}>
-                <input
-                  type="color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  style={{
-                    border: "none",
-                    padding: 0,
-                    width: "150%",
-                    height: "150%",
-                    cursor: "pointer",
-                    transform: "scale(1.5)",
-                    background: "none"
-                  }}
-                />
-              </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>空间限额预警（可选）</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="number"
+                className="input"
+                placeholder="留空则不开启预警，例如：5"
+                value={warningThresholdValue}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setWarningThresholdValue(val === "" ? "" : Number(val));
+                }}
+                style={{ flex: 1 }}
+                min="1"
+              />
+              <select
+                className="input"
+                value={warningThresholdUnit}
+                onChange={(e) => setWarningThresholdUnit(e.target.value as "MB" | "GB")}
+                style={{ width: 100 }}
+              >
+                <option value="MB">MB</option>
+                <option value="GB">GB</option>
+              </select>
+            </div>
+            <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
+              💡 设置后，当该存储的已用容量接近或超过此限额时，将在图片上传页面进行友好提示。
             </div>
           </div>
-          <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
-            💡 为该存储选择一个标志性颜色，图片在图库中会展示对应颜色的圆点标记。
+
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>存储标签颜色（可选）</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minHeight: 38 }}>
+              {[
+                { hex: "#3B82F6", name: "蓝色" },
+                { hex: "#10B981", name: "绿色" },
+                { hex: "#8B5CF6", name: "紫色" },
+                { hex: "#F59E0B", name: "橙色" },
+                { hex: "#EF4444", name: "红色" },
+                { hex: "#EC4899", name: "粉色" },
+                { hex: "#6B7280", name: "灰色" }
+              ].map((preset) => {
+                const isSelected = color === preset.hex;
+                return (
+                  <button
+                    key={preset.hex}
+                    type="button"
+                    onClick={() => setColor(preset.hex)}
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: "50%",
+                      backgroundColor: preset.hex,
+                      border: isSelected ? "2px solid var(--color-text-primary)" : "2px solid transparent",
+                      boxShadow: isSelected ? "0 0 0 2px var(--color-bg-base)" : "none",
+                      cursor: "pointer",
+                      transform: isSelected ? "scale(1.15)" : "scale(1)",
+                      transition: "transform 0.2s, border-color 0.2s",
+                      padding: 0,
+                    }}
+                    title={preset.name}
+                  />
+                );
+              })}
+
+              {/* 自定义颜色选择器 */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>自定义:</span>
+                <div style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  border: "1px solid var(--color-border)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "var(--color-bg-input)",
+                }}>
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    style={{
+                      border: "none",
+                      padding: 0,
+                      width: "150%",
+                      height: "150%",
+                      cursor: "pointer",
+                      transform: "scale(1.5)",
+                      background: "none"
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
+              💡 为该存储选择一个标志性颜色，图片在图库中会展示对应颜色的圆点标记。
+            </div>
           </div>
         </div>
 
