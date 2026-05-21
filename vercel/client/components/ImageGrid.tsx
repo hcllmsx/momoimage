@@ -422,27 +422,6 @@ export function ImageGrid({
                   alt={image.originalName}
                   loading="lazy"
                 />
-                {(() => {
-                  const config = getStorageInfo(image.storageId);
-                  if (!config?.color) return null;
-                  return (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 8,
-                        right: 8,
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        backgroundColor: config.color,
-                        border: "2px solid #ffffff",
-                        boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
-                        zIndex: 8,
-                      }}
-                      title={`存储位置: ${config.name}`}
-                    />
-                  );
-                })()}
                 {/* 仅在非多选模式下显示悬浮动作栏 */}
                 {!isMultiSelectMode && (
                   <div className="image-card__overlay">
@@ -493,8 +472,28 @@ export function ImageGrid({
               </div>
 
               <div className="image-card__info">
-                <div className="image-card__name" title={image.originalName}>
-                  {image.originalName}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <div className="image-card__name" title={image.originalName} style={{ flex: 1 }}>
+                    {image.originalName}
+                  </div>
+                  {(() => {
+                    const config = getStorageInfo(image.storageId);
+                    if (!config?.color) return null;
+                    return (
+                      <div
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          backgroundColor: config.color,
+                          flexShrink: 0,
+                          border: "1px solid rgba(0, 0, 0, 0.1)",
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                        }}
+                        title={`存储位置: ${config.name}`}
+                      />
+                    );
+                  })()}
                 </div>
                 <div className="image-card__meta">
                   {formatFileSize(image.size)} · {formatDate(image.uploadedAt)}
