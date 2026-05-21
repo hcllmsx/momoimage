@@ -373,7 +373,7 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
             }}
             disabled={isEdit}
           >
-            <option value="r2-external">Cloudflare R2（外部账号 S3 接入）</option>
+            <option value="r2-external">Cloudflare R2（外部账号）</option>
             <option value="oracle">甲骨文云 OCI 对象存储</option>
             <option value="s3-general">AWS S3 / 其他 S3 兼容存储</option>
             <option value="vercel-blob">Vercel Blob</option>
