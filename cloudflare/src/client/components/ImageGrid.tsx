@@ -22,6 +22,7 @@ export function ImageGrid({
   onDeleteFolder,
   onMoveImage,
   onMoveMultiple,
+  storageConfigs = [],
 }: {
   images: ImageMeta[];
   loading: boolean;
@@ -37,10 +38,17 @@ export function ImageGrid({
   onDeleteFolder: (id: string) => Promise<void>;
   onMoveImage: (id: string, folderId: string | null) => Promise<void>;
   onMoveMultiple: (ids: string[], folderId: string | null) => Promise<void>;
+  storageConfigs?: any[];
 }) {
   const { showToast } = useToastContext();
   const [movingImageId, setMovingImageId] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<ImageMeta | null>(null);
+
+  const getStorageInfo = (storageId: string) => {
+    const localId = "local-r2";
+    const id = storageId || localId;
+    return storageConfigs?.find(c => c.id === id);
+  };
 
   // 弹窗状态
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -414,6 +422,27 @@ export function ImageGrid({
                   alt={image.originalName}
                   loading="lazy"
                 />
+                {(() => {
+                  const config = getStorageInfo(image.storageId);
+                  if (!config?.color) return null;
+                  return (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        backgroundColor: config.color,
+                        border: "2px solid #ffffff",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+                        zIndex: 8,
+                      }}
+                      title={`存储位置: ${config.name}`}
+                    />
+                  );
+                })()}
                 {/* 仅在非多选模式下显示悬浮动作栏 */}
                 {!isMultiSelectMode && (
                   <div className="image-card__overlay">
@@ -913,8 +942,33 @@ export function ImageGrid({
               <span style={{ fontWeight: 600, fontSize: 14, color: "var(--color-text)" }}>
                 {lightboxImage.originalName}
               </span>
-              <span style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginTop: 2 }}>
-                {formatFileSize(lightboxImage.size)} · {lightboxImage.mimeType}
+              <span style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginTop: 2, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                <span>{formatFileSize(lightboxImage.size)}</span>
+                <span>·</span>
+                <span>{lightboxImage.mimeType}</span>
+                {(() => {
+                  const config = getStorageInfo(lightboxImage.storageId);
+                  return (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <span>·</span>
+                      <span>存储位置：</span>
+                      {config?.color && (
+                        <span style={{
+                          display: "inline-block",
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          backgroundColor: config.color,
+                          border: "1px solid #ffffff",
+                          boxShadow: "0 0 2px rgba(0,0,0,0.3)",
+                        }} />
+                      )}
+                      <span style={{ fontWeight: 500, color: "var(--color-text-secondary)" }}>
+                        {config?.name || (lightboxImage.storageId === "local-r2" ? "本地内置存储" : "未知存储")}
+                      </span>
+                    </span>
+                  );
+                })()}
               </span>
             </div>
             <button

@@ -94,6 +94,30 @@ storage.delete("/:id", async (c) => {
   const id = c.req.param("id");
   const storageManager = c.get("storageManager") as StorageManager;
   try {
+    // 检查是否有任何图片关联了当前待删除的存储空间 ID
+    const allIds = ((await kvGetJSON<string[]>("momoimage:image:list")) ?? []);
+    let hasImages = false;
+    const batchSize = 100;
+    for (let i = 0; i < allIds.length; i += batchSize) {
+      const batchIds = allIds.slice(i, i + batchSize);
+      const batchPromises = batchIds.map(imgId => kvGetJSON<any>(`momoimage:image:${imgId}`));
+      const batchResults = await Promise.all(batchPromises);
+      for (const meta of batchResults) {
+        if (meta && typeof meta === "object") {
+          const sId = meta.storageId || "local-blob";
+          if (sId === id) {
+            hasImages = true;
+            break;
+          }
+        }
+      }
+      if (hasImages) break;
+    }
+
+    if (hasImages) {
+      return c.json({ success: false, error: "该存储空间中已存有图片，无法删除。请先删除或转移该存储空间中的图片。" }, 400);
+    }
+
     await storageManager.removeStorage(id);
     return c.json({ success: true });
   } catch (err) {

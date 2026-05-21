@@ -85,6 +85,8 @@ export interface StorageConfig {
   warningThresholdValue?: number;
   /** 空间限额预警单位 */
   warningThresholdUnit?: "MB" | "GB";
+  /** 存储标签颜色（十六进制，如 #3B82F6） */
+  color?: string;
 }
 
 /** API Token */

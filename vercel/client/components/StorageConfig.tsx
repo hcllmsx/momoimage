@@ -8,7 +8,7 @@ import * as api from "../lib/api";
 import { getStorageTypeName, formatFileSize } from "../lib/utils";
 import { useToastContext } from "../App";
 
-export function StorageConfig() {
+export function StorageConfig({ onConfigsChange }: { onConfigsChange?: () => void }) {
   const [configs, setConfigs] = useState<StorageConfigType[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingConfig, setEditingConfig] = useState<StorageConfigType | null>(null);
@@ -39,12 +39,17 @@ export function StorageConfig() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, fileCount = 0) => {
+    if (fileCount > 0) {
+      showToast("该存储空间中已存有图片，无法删除。请先删除或转移该存储空间中的图片。", "error");
+      return;
+    }
     if (!confirm("确定要删除这个存储配置吗？")) return;
     try {
       await api.deleteStorage(id);
       setConfigs((prev) => prev.filter((c) => c.id !== id));
       showToast("已删除", "success");
+      onConfigsChange?.();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "删除失败", "error");
     }
@@ -55,6 +60,7 @@ export function StorageConfig() {
       await api.updateStorage(config.id, { ...config, isDefault: true });
       showToast(`已成功将 "${config.name}" 设为默认存储`, "success");
       loadConfigs();
+      onConfigsChange?.();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "设置默认失败", "error");
     }
@@ -64,6 +70,7 @@ export function StorageConfig() {
     setShowAddForm(false);
     setEditingConfig(null);
     loadConfigs();
+    onConfigsChange?.();
   };
 
   const getIcon = (type: StorageType) => {
@@ -117,6 +124,21 @@ export function StorageConfig() {
                     <div className="storage-item__name">
                       {config.name}
                       {config.isDefault && <span className="storage-item__badge" style={{ marginLeft: 8 }}>默认</span>}
+                      {config.color && (
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            backgroundColor: config.color,
+                            marginLeft: 8,
+                            boxShadow: "0 0 2px rgba(0,0,0,0.2)",
+                            verticalAlign: "middle"
+                          }}
+                          title={`颜色标签: ${config.color}`}
+                        />
+                      )}
                     </div>
                     <div className="storage-item__type">
                       {getStorageTypeName(config.type, config)}
@@ -142,7 +164,7 @@ export function StorageConfig() {
                       编辑
                     </button>
                     {config.id !== "local-blob" && (
-                      <button className="btn btn--danger btn--sm" onClick={() => handleDelete(config.id)}>删除</button>
+                      <button className="btn btn--danger btn--sm" onClick={() => handleDelete(config.id, config.fileCount || 0)}>删除</button>
                     )}
                   </div>
                 </div>
@@ -224,6 +246,9 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
   // Vercel Blob 字段
   const [blobToken, setBlobToken] = useState(config?.vercelBlobConfig?.token || "");
 
+  // 颜色标签字段
+  const [color, setColor] = useState(config?.color || "#3B82F6");
+
   // 解析 R2 完整链接的工具函数
   const parseR2Url = (url: string) => {
     try {
@@ -252,9 +277,10 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
           enabled: config!.enabled ?? true,
           warningThresholdValue: warningThresholdValue !== "" ? Number(warningThresholdValue) : undefined,
           warningThresholdUnit: warningThresholdValue !== "" ? warningThresholdUnit : undefined,
+          color,
         };
         await api.updateStorage(config!.id, submitConfig);
-        showToast("本地存储限额预警保存成功", "success");
+        showToast("本地存储配置保存成功", "success");
         onSaved();
         return;
       }
@@ -272,6 +298,7 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
         enabled: config?.enabled ?? true,
         warningThresholdValue: warningThresholdValue !== "" ? Number(warningThresholdValue) : undefined,
         warningThresholdUnit: warningThresholdValue !== "" ? warningThresholdUnit : undefined,
+        color,
       };
 
       if (type === "s3") {
@@ -403,22 +430,22 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>显示名称</label>
-              <input className="input" placeholder="如：甲骨文云免费存储" value={name} onChange={(e) => setName(e.target.value)} disabled={isLocal} />
+              <input className="input" placeholder="如：我的免费存储" value={name} onChange={(e) => setName(e.target.value)} disabled={isLocal} />
             </div>
           </>
         )}
         <div>
           <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>空间限额预警（可选）</label>
           <div style={{ display: "flex", gap: 8 }}>
-            <input 
-              type="number" 
-              className="input" 
-              placeholder="留空则不开启预警，例如：5" 
-              value={warningThresholdValue} 
+            <input
+              type="number"
+              className="input"
+              placeholder="留空则不开启预警，例如：5"
+              value={warningThresholdValue}
               onChange={(e) => {
                 const val = e.target.value;
                 setWarningThresholdValue(val === "" ? "" : Number(val));
-              }} 
+              }}
               style={{ flex: 1 }}
               min="1"
             />
@@ -434,6 +461,77 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
           </div>
           <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
             💡 设置后，当该存储的已用容量接近或超过此限额时，将在图片上传页面进行友好提示。
+          </div>
+        </div>
+
+        <div>
+          <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>存储标签颜色（可选）</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {[
+              { hex: "#3B82F6", name: "蓝色" },
+              { hex: "#10B981", name: "绿色" },
+              { hex: "#8B5CF6", name: "紫色" },
+              { hex: "#F59E0B", name: "橙色" },
+              { hex: "#EF4444", name: "红色" },
+              { hex: "#EC4899", name: "粉色" },
+              { hex: "#6B7280", name: "灰色" }
+            ].map((preset) => {
+              const isSelected = color === preset.hex;
+              return (
+                <button
+                  key={preset.hex}
+                  type="button"
+                  onClick={() => setColor(preset.hex)}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    backgroundColor: preset.hex,
+                    border: isSelected ? "2px solid var(--color-text-primary)" : "2px solid transparent",
+                    boxShadow: isSelected ? "0 0 0 2px var(--color-bg-base)" : "none",
+                    cursor: "pointer",
+                    transform: isSelected ? "scale(1.15)" : "scale(1)",
+                    transition: "transform 0.2s, border-color 0.2s",
+                    padding: 0,
+                  }}
+                  title={preset.name}
+                />
+              );
+            })}
+
+            {/* 自定义颜色选择器 */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+              <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>自定义:</span>
+              <div style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                overflow: "hidden",
+                border: "1px solid var(--color-border)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "var(--color-bg-input)",
+              }}>
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  style={{
+                    border: "none",
+                    padding: 0,
+                    width: "150%",
+                    height: "150%",
+                    cursor: "pointer",
+                    transform: "scale(1.5)",
+                    background: "none"
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
+            💡 为该存储选择一个标志性颜色，图片在图库中会展示对应颜色的圆点标记。
           </div>
         </div>
 
@@ -659,7 +757,7 @@ function TokenManager() {
       <div className="card__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span className="card__title">API Token</span>
-          <button 
+          <button
             type="button"
             onClick={() => setShowHelp(true)}
             style={{
@@ -889,7 +987,7 @@ print(response.json())`;
 
         {/* 内容区域 */}
         <div style={{ overflowY: "visible" }}>
-          
+
           {/* 一、什么是 API Token */}
           <div className="help-section">
             <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>一、关于 API Token</h3>
@@ -904,22 +1002,22 @@ print(response.json())`;
             <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, marginBottom: 10 }}>
               上传接口支持通用的 Multipart 表单数据格式，可以通过常规 POST 请求完成数据传输。
             </p>
-            
+
             <div style={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: "6px 12px", fontSize: 13, padding: "10px 14px", background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)" }}>
               <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>接口地址</div>
               <div style={{ color: "var(--color-primary)", fontWeight: 600, fontFamily: "monospace" }}>
                 {origin}/api/upload
-                <span 
-                  onClick={() => handleCopy(`${origin}/api/upload`)} 
+                <span
+                  onClick={() => handleCopy(`${origin}/api/upload`)}
                   style={{ marginLeft: 8, fontSize: 11, color: "var(--color-text-tertiary)", cursor: "pointer", textDecoration: "underline" }}
                 >
                   复制
                 </span>
               </div>
-              
+
               <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>请求方法</div>
               <div style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>POST</div>
-              
+
               <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>认证头部</div>
               <div style={{ fontFamily: "monospace", color: "var(--color-text-primary)" }}>
                 Authorization: Token &lt;您的 API Token&gt;
@@ -975,7 +1073,7 @@ print(response.json())`;
           {/* 四、快捷代码与脚本调用 */}
           <div className="help-section">
             <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>四、快捷代码与脚本调用</h3>
-            
+
             <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, marginBottom: 6 }}>
               <strong>1. cURL 命令行上传：</strong>
             </p>
@@ -992,7 +1090,7 @@ print(response.json())`;
               <button className="copy-btn" onClick={() => handleCopy(pythonCode)}>复制</button>
             </div>
           </div>
-          
+
         </div>
 
         {/* 底部面板 */}

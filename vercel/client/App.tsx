@@ -3,7 +3,7 @@
 // ============================================
 
 import { useState, useEffect, useCallback, createContext, useContext } from "react";
-import type { SystemInfo, ImageMeta, UploadResult, Folder } from "@shared/types";
+import type { SystemInfo, ImageMeta, UploadResult, Folder, StorageConfig as StorageConfigType } from "@shared/types";
 import * as api from "./lib/api";
 import { LoginForm } from "./components/LoginForm";
 import { Header } from "./components/Header";
@@ -19,7 +19,7 @@ interface ToastContextValue {
   showToast: (message: string, type?: "success" | "error") => void;
 }
 export const ToastContext = createContext<ToastContextValue>({
-  showToast: () => {},
+  showToast: () => { },
 });
 export const useToastContext = () => useContext(ToastContext);
 
@@ -45,6 +45,7 @@ export default function App() {
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [storageConfigs, setStorageConfigs] = useState<StorageConfigType[]>([]);
 
   // 保存当前选项卡状态至 localStorage
   useEffect(() => {
@@ -76,12 +77,23 @@ export default function App() {
     }
   }, []);
 
+  // 加载存储配置列表
+  const loadStorageConfigs = useCallback(async () => {
+    try {
+      const list = await api.getStorageConfigs();
+      setStorageConfigs(list);
+    } catch (err) {
+      console.error("Failed to load storage configs:", err);
+    }
+  }, []);
+
   useEffect(() => {
     if (loggedIn) {
       loadFolders();
       loadSystemStats();
+      loadStorageConfigs();
     }
-  }, [loggedIn, loadFolders, loadSystemStats]);
+  }, [loggedIn, loadFolders, loadSystemStats, loadStorageConfigs]);
 
   // 获取系统信息
   useEffect(() => {
@@ -344,11 +356,12 @@ export default function App() {
               onDeleteFolder={handleDeleteFolder}
               onMoveImage={handleMoveImage}
               onMoveMultiple={handleMoveMultipleImages}
+              storageConfigs={storageConfigs}
             />
           )}
 
           {/* 存储配置页 */}
-          {activeTab === "storage" && <StorageConfig />}
+          {activeTab === "storage" && <StorageConfig onConfigsChange={loadStorageConfigs} />}
         </main>
 
         <Footer />
