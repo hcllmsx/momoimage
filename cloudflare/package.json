@@ -1,6 +1,6 @@
 {
   "name": "momoimage",
-  "version": "1.0.0",
+  "version": "1.5.21",
   "description": "默默图床 - 现代化图片托管系统",
   "type": "module",
   "scripts": {

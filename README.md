@@ -99,6 +99,7 @@ Vercel 版代码管理在 `vercel/` 目录下。
 | `ADMIN_PASSWORD` | **推荐** | `momoimage` | 后台管理登录密码，如果不配置，网页端会展示引导设置 Banner。 |
 | `JWT_SECRET` | 可选 | KV 自动生成并安全持久化 | 生成 JWT 用户会话的签名密钥。更改或删除此密钥会使所有已登录设备强制立即下线。 |
 | `SITE_URL` | 可选 | 当前请求的 Host 推导 | 图床的公共访问主域，强烈推荐配置以保障图片代理直链地址 100% 对齐。 |
+| `MOMO_STORAGE_ROOT` | 可选 | Vercel版: `momoimageVercel`<br/>Cloudflare版: `momoimageCloudflare` | 存储空间中最外层根文件夹名称。**仅限大小写字母与数字**。变更该值不会破坏已上传图片的访问直链。 |
 
 ---
 

@@ -133,19 +133,17 @@ export function StorageConfig() {
                     {!config.isDefault && (
                       <button className="btn btn--ghost btn--sm" onClick={() => handleSetDefault(config)}>设为默认</button>
                     )}
+                    <button
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => {
+                        setEditingConfig(config);
+                        setShowAddForm(true);
+                      }}
+                    >
+                      编辑
+                    </button>
                     {config.id !== "local-r2" && (
-                      <>
-                        <button
-                          className="btn btn--ghost btn--sm"
-                          onClick={() => {
-                            setEditingConfig(config);
-                            setShowAddForm(true);
-                          }}
-                        >
-                          编辑
-                        </button>
-                        <button className="btn btn--danger btn--sm" onClick={() => handleDelete(config.id)}>删除</button>
-                      </>
+                      <button className="btn btn--danger btn--sm" onClick={() => handleDelete(config.id)}>删除</button>
                     )}
                   </div>
                 </div>
@@ -620,6 +618,7 @@ function TokenManager() {
   const [tokens, setTokens] = useState<Array<{ id: string; name: string; token: string; createdAt: string }>>([]);
   const [newTokenName, setNewTokenName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const { showToast } = useToastContext();
 
   useEffect(() => {
@@ -658,8 +657,40 @@ function TokenManager() {
 
   return (
     <div className="card">
-      <div className="card__header">
-        <span className="card__title">API Token</span>
+      <div className="card__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span className="card__title">API Token</span>
+          <button 
+            type="button"
+            onClick={() => setShowHelp(true)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "4px",
+              color: "var(--color-text-tertiary)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "color 0.2s, transform 0.2s"
+            }}
+            title="查看接入指南"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "var(--color-primary)";
+              e.currentTarget.style.transform = "scale(1.15)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "var(--color-text-tertiary)";
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="12" x2="12.01" y2="12"></line>
+            </svg>
+          </button>
+        </div>
       </div>
       <div className="card__body">
         <p style={{ fontSize: 13, color: "var(--color-text-tertiary)", marginBottom: 12 }}>
@@ -687,6 +718,290 @@ function TokenManager() {
         ) : (
           <p style={{ fontSize: 13, color: "var(--color-text-tertiary)", textAlign: "center", padding: 16 }}>暂无 API Token</p>
         )}
+      </div>
+
+      {showHelp && <TokenHelpModal onClose={() => setShowHelp(false)} />}
+    </div>
+  );
+}
+
+// ========= API Token 接入指南全屏弹窗 =========
+function TokenHelpModal({ onClose }: { onClose: () => void }) {
+  const { showToast } = useToastContext();
+  const origin = window.location.origin;
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("已成功复制到剪贴板", "success");
+    } catch {
+      showToast("复制失败，请手动选择复制", "error");
+    }
+  };
+
+  const picgoJson = JSON.stringify({
+    "Authorization": "Token <您的 API Token>"
+  }, null, 2);
+
+  const pythonCode = `import requests
+
+url = "${origin}/api/upload"
+headers = {
+    "Authorization": "Token <您的 API Token>"
+}
+files = {
+    "file": open("image.png", "rb")
+}
+
+response = requests.post(url, headers=headers, files=files)
+print(response.json())`;
+
+  const curlCmd = `curl -X POST -H "Authorization: Token <您的 API Token>" -F "file=@/path/to/image.png" ${origin}/api/upload`;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "var(--color-bg-base)",
+        backdropFilter: "blur(20px)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "flex-start",
+        zIndex: 9999,
+        cursor: "default",
+        animation: "fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        overflowY: "auto",
+        padding: "40px 20px",
+      }}
+    >
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from { transform: scale(0.96); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        .help-card::-webkit-scrollbar {
+          width: 6px;
+        }
+        .help-card::-webkit-scrollbar-thumb {
+          background: rgba(0, 0, 0, 0.15);
+          border-radius: 3px;
+        }
+        .help-section {
+          border-bottom: 1px solid var(--color-border);
+          padding-bottom: 24px;
+          margin-bottom: 24px;
+        }
+        .help-section:last-child {
+          border-bottom: none;
+          padding-bottom: 0;
+          margin-bottom: 0;
+        }
+        .code-block {
+          background: var(--color-bg-input);
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-sm);
+          padding: 14px;
+          font-family: "SF Mono", Consolas, Monaco, monospace;
+          font-size: 13px;
+          color: var(--color-text-primary);
+          overflow-x: auto;
+          position: relative;
+          margin-top: 8px;
+          margin-bottom: 12px;
+        }
+        .copy-btn {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          padding: 4px 8px;
+          font-size: 11px;
+          font-weight: 500;
+          background: var(--color-bg-elevated);
+          border: 1px solid var(--color-border);
+          border-radius: 4px;
+          color: var(--color-text-secondary);
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .copy-btn:hover {
+          background: var(--color-primary);
+          color: var(--color-text-inverse);
+          border-color: var(--color-primary);
+        }
+      `}</style>
+
+      <div
+        className="help-card"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: "800px",
+          background: "var(--color-bg-elevated)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-lg)",
+          boxShadow: "var(--shadow-lg)",
+          padding: "36px 40px",
+          position: "relative",
+          animation: "scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/* 关闭按钮 */}
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: 24,
+            right: 24,
+            background: "none",
+            border: "none",
+            fontSize: 22,
+            cursor: "pointer",
+            color: "var(--color-text-tertiary)",
+            transition: "color 0.2s",
+            lineHeight: 1,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-text-primary)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--color-text-tertiary)")}
+        >
+          ✕
+        </button>
+
+        {/* 头部标题 */}
+        <div style={{ marginBottom: 28 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--color-text-primary)", display: "flex", alignItems: "center", gap: 10 }}>
+            <span>🔑</span> API Token 接入指南
+          </h2>
+          <p style={{ fontSize: 13, color: "var(--color-text-tertiary)", marginTop: 6 }}>
+            关于 API Token 的作用机制、常用图客工具（PicGo）配置与代码调用示例
+          </p>
+        </div>
+
+        {/* 内容区域 */}
+        <div style={{ overflowY: "visible" }}>
+          
+          {/* 一、什么是 API Token */}
+          <div className="help-section">
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>一、关于 API Token</h3>
+            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+              API Token 是默默图床提供的无状态会话安全密钥。它适用于在第三方图片上传工具（如 PicGo、PicList、自定义脚本等）中代替原本基于 JWT Session 的登录状态。API Token 一经生成便可以永久使用，删除后会立即失效。出于安全性考虑，生成的 API Token 只有在刚刚创建完成时会完整展示一次，后续无法再次查看。
+            </p>
+          </div>
+
+          {/* 二、标准接口规范 */}
+          <div className="help-section">
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>二、标准接口上传规范</h3>
+            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, marginBottom: 10 }}>
+              上传接口支持通用的 Multipart 表单数据格式，可以通过常规 POST 请求完成数据传输。
+            </p>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: "6px 12px", fontSize: 13, padding: "10px 14px", background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)" }}>
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>接口地址</div>
+              <div style={{ color: "var(--color-primary)", fontWeight: 600, fontFamily: "monospace" }}>
+                {origin}/api/upload
+                <span 
+                  onClick={() => handleCopy(`${origin}/api/upload`)} 
+                  style={{ marginLeft: 8, fontSize: 11, color: "var(--color-text-tertiary)", cursor: "pointer", textDecoration: "underline" }}
+                >
+                  复制
+                </span>
+              </div>
+              
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>请求方法</div>
+              <div style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>POST</div>
+              
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>认证头部</div>
+              <div style={{ fontFamily: "monospace", color: "var(--color-text-primary)" }}>
+                Authorization: Token &lt;您的 API Token&gt;
+              </div>
+
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>请求体参数</div>
+              <div style={{ color: "var(--color-text-secondary)", lineHeight: 1.4 }}>
+                <strong style={{ color: "var(--color-text-primary)" }}>file</strong>: File (必填，待上传的图片文件)<br />
+                <strong style={{ color: "var(--color-text-primary)" }}>folderId</strong>: String (可选，待上传到的目标分类文件夹ID)
+              </div>
+            </div>
+          </div>
+
+          {/* 三、PicGo / PicList 接入配置 */}
+          <div className="help-section">
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>三、PicGo / PicList 自定义图床配置教程</h3>
+            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, marginBottom: 12 }}>
+              在 PicGo 或 PicList 等第三方软件中，请在左侧边栏“图床设置”中选择 <strong>“自定义 Web 图床”</strong>，并按下图及说明参数进行配置：
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "8px 16px", fontSize: 13 }}>
+                <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, display: "flex", alignItems: "center" }}>API 地址 (URL)</div>
+                <div style={{ fontFamily: "monospace", background: "var(--color-bg-input)", border: "1px solid var(--color-border)", padding: "6px 12px", borderRadius: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>{origin}/api/upload</span>
+                  <button className="btn btn--primary btn--sm" style={{ padding: "2px 8px", fontSize: 11, height: "auto" }} onClick={() => handleCopy(`${origin}/api/upload`)}>复制</button>
+                </div>
+
+                <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, display: "flex", alignItems: "center" }}>POST 参数名</div>
+                <div style={{ fontFamily: "monospace", background: "var(--color-bg-input)", border: "1px solid var(--color-border)", padding: "6px 12px", borderRadius: 4 }}>
+                  file
+                </div>
+
+                <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, display: "flex", alignItems: "center" }}>JSON 路径</div>
+                <div style={{ fontFamily: "monospace", background: "var(--color-bg-input)", border: "1px solid var(--color-border)", padding: "6px 12px", borderRadius: 4 }}>
+                  data.url
+                </div>
+
+                <div style={{ color: "var(--color-text-secondary)", fontWeight: 500 }}>自定义请求头 (Headers)</div>
+                <div style={{ position: "relative" }}>
+                  <pre className="code-block" style={{ margin: 0, paddingRight: 60 }}>
+                    {picgoJson}
+                    <button className="copy-btn" onClick={() => handleCopy(picgoJson)}>复制</button>
+                  </pre>
+                  <span style={{ fontSize: 11, color: "var(--color-text-tertiary)", display: "block", marginTop: 4 }}>
+                    * 注意：请将括号及其中的中文替换为您在后台生成的真实 API Token 值
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 四、快捷代码与脚本调用 */}
+          <div className="help-section">
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>四、快捷代码与脚本调用</h3>
+            
+            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, marginBottom: 6 }}>
+              <strong>1. cURL 命令行上传：</strong>
+            </p>
+            <div className="code-block" style={{ paddingRight: 60 }}>
+              {curlCmd}
+              <button className="copy-btn" onClick={() => handleCopy(curlCmd)}>复制</button>
+            </div>
+
+            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, marginTop: 14, marginBottom: 6 }}>
+              <strong>2. Python (requests) 示例代码：</strong>
+            </p>
+            <div className="code-block" style={{ paddingRight: 60 }}>
+              <pre style={{ margin: 0 }}>{pythonCode}</pre>
+              <button className="copy-btn" onClick={() => handleCopy(pythonCode)}>复制</button>
+            </div>
+          </div>
+          
+        </div>
+
+        {/* 底部面板 */}
+        <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end", borderTop: "1px solid var(--color-border)", paddingTop: 20 }}>
+          <button className="btn btn--primary" onClick={onClose} style={{ padding: "8px 24px" }}>
+            我知道了
+          </button>
+        </div>
       </div>
     </div>
   );
