@@ -132,19 +132,17 @@ export function StorageConfig() {
                     {!config.isDefault && (
                       <button className="btn btn--ghost btn--sm" onClick={() => handleSetDefault(config)}>设为默认</button>
                     )}
+                    <button
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => {
+                        setEditingConfig(config);
+                        setShowAddForm(true);
+                      }}
+                    >
+                      编辑
+                    </button>
                     {config.id !== "local-blob" && (
-                      <>
-                        <button
-                          className="btn btn--ghost btn--sm"
-                          onClick={() => {
-                            setEditingConfig(config);
-                            setShowAddForm(true);
-                          }}
-                        >
-                          编辑
-                        </button>
-                        <button className="btn btn--danger btn--sm" onClick={() => handleDelete(config.id)}>删除</button>
-                      </>
+                      <button className="btn btn--danger btn--sm" onClick={() => handleDelete(config.id)}>删除</button>
                     )}
                   </div>
                 </div>
@@ -176,6 +174,7 @@ interface StorageFormProps {
 
 function StorageForm({ config, onSaved }: StorageFormProps) {
   const isEdit = !!config;
+  const isLocal = config?.id === "local-blob" || config?.id === "local-r2";
 
   // 根据 Endpoint 特征自动判断供应商类别（是否是外部 R2 或甲骨文云）
   const getInitialProvider = (): "r2-external" | "s3-general" | "vercel-blob" | "oracle" => {
@@ -244,6 +243,22 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
     setLoading(true);
 
     try {
+      if (isLocal) {
+        const submitConfig: any = {
+          id: config!.id,
+          name: config!.name,
+          type: config!.type,
+          isDefault: config!.isDefault || false,
+          enabled: config!.enabled ?? true,
+          warningThresholdValue: warningThresholdValue !== "" ? Number(warningThresholdValue) : undefined,
+          warningThresholdUnit: warningThresholdValue !== "" ? warningThresholdUnit : undefined,
+        };
+        await api.updateStorage(config!.id, submitConfig);
+        showToast("本地存储限额预警保存成功", "success");
+        onSaved();
+        return;
+      }
+
       // 确定提交的底层类型：s3, vercel-blob 或 oracle
       let type: StorageType = "s3";
       if (provider === "vercel-blob") type = "vercel-blob";
@@ -361,7 +376,7 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
           <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>接入供应商 / 协议</label>
           <select
             className="input"
-            value={provider}
+            value={isLocal ? config!.type : provider}
             onChange={(e) => {
               const val = e.target.value as any;
               setProvider(val);
@@ -375,8 +390,9 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
                 }
               }
             }}
-            disabled={isEdit}
+            disabled={isEdit || isLocal}
           >
+            {isLocal && <option value={config!.type}>本地内置存储 ({(config!.type as string) === "r2-binding" ? "Cloudflare R2" : "Vercel Blob"})</option>}
             <option value="r2-external">Cloudflare R2</option>
             <option value="oracle">甲骨文云 OCI 对象存储</option>
             <option value="s3-general">AWS S3 / 其他 S3 兼容存储</option>
@@ -385,7 +401,7 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
         </div>
         <div>
           <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>显示名称</label>
-          <input className="input" placeholder="如：甲骨文云免费存储" value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="input" placeholder="如：甲骨文云免费存储" value={name} onChange={(e) => setName(e.target.value)} disabled={isLocal} />
         </div>
         <div>
           <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>空间限额预警（可选）</label>
@@ -417,7 +433,7 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
           </div>
         </div>
 
-        {provider === "r2-external" && (
+        {provider === "r2-external" && !isLocal && (
           <>
             <div>
               <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>R2 S3 API 链接（直接从 CF 后台粘贴）</label>
@@ -465,7 +481,7 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
           </>
         )}
 
-        {provider === "oracle" && (
+        {provider === "oracle" && !isLocal && (
           <>
             <div style={{
               background: "rgba(59, 130, 246, 0.08)",
@@ -544,7 +560,7 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
           </>
         )}
 
-        {provider === "s3-general" && (
+        {provider === "s3-general" && !isLocal && (
           <>
             <div>
               <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>Endpoint</label>
@@ -577,7 +593,7 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
           </>
         )}
 
-        {provider === "vercel-blob" && (
+        {provider === "vercel-blob" && !isLocal && (
           <div>
             <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>BLOB_READ_WRITE_TOKEN</label>
             <input className="input" type="password" placeholder={isEdit ? "******" : ""} value={blobToken} onChange={(e) => setBlobToken(e.target.value)} />

@@ -50,12 +50,15 @@ export class StorageManager {
 
     // 2. 如果有 R2 Binding，自动注册本账号 R2
     if (this.r2Bucket) {
+      const savedLocalR2 = savedConfigs.find((c) => c.id === "local-r2");
       const localR2Config: StorageConfig = {
         id: "local-r2",
         name: "本地 R2 存储",
         type: "r2-binding",
-        isDefault: !hasDefaultExternal, // 如果外部已经有默认存储，则本地存储不作为默认
-        enabled: true,
+        isDefault: savedLocalR2 ? savedLocalR2.isDefault : !hasDefaultExternal, // 如果外部已经有默认存储，则本地存储不作为默认
+        enabled: savedLocalR2 ? savedLocalR2.enabled : true,
+        warningThresholdValue: savedLocalR2?.warningThresholdValue,
+        warningThresholdUnit: savedLocalR2?.warningThresholdUnit,
       };
       this.configs.push(localR2Config);
       this.adapters.set(
@@ -66,6 +69,7 @@ export class StorageManager {
 
     // 3. 加载外部存储适配器并保存到 configs
     for (const config of savedConfigs) {
+      if (config.id === "local-r2") continue;
       try {
         await this.createAdapter(config);
         this.configs.push(config);
@@ -258,11 +262,10 @@ export class StorageManager {
     this.adapters.set(config.id, adapter);
   }
 
-  /** 保存配置到 KV（排除 local-r2） */
+  /** 保存配置到 KV */
   private async saveConfigs(): Promise<void> {
     if (!this.kv) return;
-    const external = this.configs.filter((c) => c.id !== "local-r2");
-    await this.kv.put(STORAGE_CONFIG_KEY, JSON.stringify(external));
+    await this.kv.put(STORAGE_CONFIG_KEY, JSON.stringify(this.configs));
   }
 
   /** 脱敏配置：隐藏密钥 */

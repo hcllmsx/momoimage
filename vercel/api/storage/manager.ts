@@ -49,12 +49,15 @@ export class StorageManager {
 
     // 2. 如果有 Vercel Blob Token，自动注册本账号 Vercel Blob 为本地默认存储
     if (this.vercelBlobToken) {
+      const savedLocalBlob = savedConfigs.find((c) => c.id === "local-blob");
       const localBlobConfig: StorageConfig = {
         id: "local-blob",
         name: "本地 Vercel Blob 存储",
         type: "vercel-blob",
-        isDefault: !hasDefaultExternal,
-        enabled: true,
+        isDefault: savedLocalBlob ? savedLocalBlob.isDefault : !hasDefaultExternal,
+        enabled: savedLocalBlob ? savedLocalBlob.enabled : true,
+        warningThresholdValue: savedLocalBlob?.warningThresholdValue,
+        warningThresholdUnit: savedLocalBlob?.warningThresholdUnit,
       };
       this.configs.push(localBlobConfig);
       const { VercelBlobAdapter } = await import("./vercel-blob");
@@ -66,6 +69,7 @@ export class StorageManager {
 
     // 3. 加载外部存储适配器并保存到 configs
     for (const config of savedConfigs) {
+      if (config.id === "local-blob") continue;
       try {
         await this.createAdapter(config);
         this.configs.push(config);
@@ -253,11 +257,10 @@ export class StorageManager {
     this.adapters.set(config.id, adapter);
   }
 
-  /** 保存配置到 KV（排除 local-blob 内置ID） */
+  /** 保存配置到 KV */
   private async saveConfigs(): Promise<void> {
     try {
-      const external = this.configs.filter((c) => c.id !== "local-blob");
-      await kvSet(STORAGE_CONFIG_KEY, external);
+      await kvSet(STORAGE_CONFIG_KEY, this.configs);
     } catch (err) {
       console.error("[StorageManager] Failed to save configs to KV:", err);
     }
