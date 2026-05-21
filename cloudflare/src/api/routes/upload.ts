@@ -89,8 +89,8 @@ upload.post("/", async (c) => {
     );
   }
 
-  // 生成文件 key: 年/月/随机6位/原文件名
-  const datePrefix = formatDatePrefix();
+  // 生成文件 key: 根文件夹/yyyyMM/dd/随机6位/原文件名
+  const datePrefix = formatDatePrefix(c);
   const randomChars = Math.random().toString(36).substring(2, 8);
   
   // 保留中英文、数字和常见符号，其他替换为下划线
@@ -222,12 +222,18 @@ function generateId(): string {
     .slice(0, 12);
 }
 
-/** 生成日期前缀：yyyy/MM */
-function formatDatePrefix(): string {
+/** 生成日期前缀：根文件夹/yyyyMM/dd */
+function formatDatePrefix(c: any): string {
+  const envVal = c.env.MOMO_STORAGE_ROOT;
+  let rootFolder = "momoimageCloudflare";
+  if (envVal && /^[a-zA-Z0-9]+$/.test(envVal)) {
+    rootFolder = envVal;
+  }
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
-  return `${year}/${month}`;
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${rootFolder}/${year}${month}/${day}`;
 }
 
 /** 将图片 ID 添加到索引列表 */

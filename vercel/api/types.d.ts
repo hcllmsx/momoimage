@@ -7,5 +7,6 @@ interface Env {
   JWT_SECRET?: string;
   SITE_URL?: string;
   BLOB_READ_WRITE_TOKEN?: string;
+  MOMO_STORAGE_ROOT?: string;
   ASSETS?: any;
 }

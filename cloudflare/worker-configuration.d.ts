@@ -7,5 +7,6 @@ interface Env {
   ADMIN_PASSWORD?: string;  // 可选 — 未设置时显示配置提示
   JWT_SECRET?: string;      // 可选 — 未设置时自动生成并存储到 KV
   SITE_URL?: string;        // 可选 — 未设置时自动从请求 URL 检测
+  MOMO_STORAGE_ROOT?: string; // 可选 — 自定义存储空间最外层文件夹名字
   ASSETS: Fetcher;
 }
