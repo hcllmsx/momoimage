@@ -5,7 +5,7 @@
 import { Hono } from "hono";
 import { signJwt, getJwtSecret } from "../middleware/auth";
 import { kvGet, kvGetJSON, kvSet, kvDel } from "../lib/kv";
-import type { ApiToken } from "@shared/types";
+import type { ApiToken } from "../../shared/types";
 
 const auth = new Hono<{ Bindings: Env }>();
 

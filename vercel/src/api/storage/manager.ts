@@ -3,7 +3,7 @@
 // 统一管理多个存储后端，支持动态添加/删除
 // ============================================
 
-import type { StorageConfig, StorageType } from "@shared/types";
+import type { StorageConfig, StorageType } from "../../shared/types";
 import type { StorageAdapter } from "./types";
 import { kvGetJSON, kvSet } from "../lib/kv";
 // S3Adapter 和 VercelBlobAdapter 使用动态导入，避免在启动时就加载

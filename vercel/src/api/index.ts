@@ -21,6 +21,16 @@ type Variables = {
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+// 环境变量注入中间件 — 必须最先注册
+// 将 Vercel 的 process.env 同步到 Hono 的 c.env 容器
+app.use("*", async (c, next) => {
+  c.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+  c.env.JWT_SECRET = process.env.JWT_SECRET || "";
+  c.env.SITE_URL = process.env.SITE_URL || "";
+  c.env.BLOB_READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || "";
+  await next();
+});
+
 // 全局中间件
 app.use("*", cors());
 app.use("*", logger());

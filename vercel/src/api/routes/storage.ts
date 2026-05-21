@@ -3,7 +3,7 @@
 // ============================================
 
 import { Hono } from "hono";
-import type { StorageConfig } from "@shared/types";
+import type { StorageConfig } from "../../shared/types";
 import { kvGetJSON } from "../lib/kv";
 import { StorageManager } from "../storage/manager";
 
