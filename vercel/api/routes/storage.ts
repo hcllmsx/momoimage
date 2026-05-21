@@ -33,7 +33,13 @@ storage.get("/", async (c) => {
       for (const meta of batchResults) {
         if (meta && typeof meta === "object") {
           const sId = meta.storageId || "local-blob";
-          const size = meta.size || 0;
+          let size = meta.size || 0;
+          if (meta.thumbnailSize !== undefined) {
+            size += meta.thumbnailSize;
+          } else if (meta.thumbnailUrl) {
+            // 兼容之前已上传但未记录 thumbnailSize 的老图片，降级使用 50KB
+            size += 50 * 1024;
+          }
           if (usedSizes[sId] !== undefined) {
             usedSizes[sId] += size;
             fileCounts[sId] += 1;

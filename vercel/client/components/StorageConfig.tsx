@@ -122,7 +122,7 @@ export function StorageConfig() {
                       {getStorageTypeName(config.type, config)}
                       {config.usedSize !== undefined && (
                         <span style={{ marginLeft: 12, opacity: 0.6, fontSize: "11px" }}>
-                          📊 已存容量: {formatFileSize(config.usedSize)} ({config.fileCount} 张图片)
+                          📊 已存容量: {formatFileSize(config.usedSize)}{config.warningThresholdValue !== undefined ? ` / ${config.warningThresholdValue} ${config.warningThresholdUnit}` : ""} ({config.fileCount} 张图片)
                         </span>
                       )}
                     </div>
@@ -195,6 +195,9 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
   const [loading, setLoading] = useState(false);
   const { showToast } = useToastContext();
 
+  const [warningThresholdValue, setWarningThresholdValue] = useState<number | "">(config?.warningThresholdValue ?? "");
+  const [warningThresholdUnit, setWarningThresholdUnit] = useState<"MB" | "GB">(config?.warningThresholdUnit ?? "GB");
+
   // R2 外部专有字段 (将 endpoint 和 bucket 拼装回完整的 R2 S3 API 链接)
   const getInitialR2Url = () => {
     if (config?.type === "s3" && config.s3Config) {
@@ -252,6 +255,8 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
         type,
         isDefault: config?.isDefault || false,
         enabled: config?.enabled ?? true,
+        warningThresholdValue: warningThresholdValue !== "" ? Number(warningThresholdValue) : undefined,
+        warningThresholdUnit: warningThresholdValue !== "" ? warningThresholdUnit : undefined,
       };
 
       if (type === "s3") {
@@ -381,6 +386,35 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
         <div>
           <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>显示名称</label>
           <input className="input" placeholder="如：甲骨文云免费存储" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div>
+          <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>空间限额预警（可选）</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input 
+              type="number" 
+              className="input" 
+              placeholder="留空则不开启预警，例如：5" 
+              value={warningThresholdValue} 
+              onChange={(e) => {
+                const val = e.target.value;
+                setWarningThresholdValue(val === "" ? "" : Number(val));
+              }} 
+              style={{ flex: 1 }}
+              min="1"
+            />
+            <select
+              className="input"
+              value={warningThresholdUnit}
+              onChange={(e) => setWarningThresholdUnit(e.target.value as "MB" | "GB")}
+              style={{ width: 100 }}
+            >
+              <option value="MB">MB</option>
+              <option value="GB">GB</option>
+            </select>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
+            💡 设置后，当该存储的已用容量接近或超过此限额时，将在图片上传页面进行友好提示。
+          </div>
         </div>
 
         {provider === "r2-external" && (

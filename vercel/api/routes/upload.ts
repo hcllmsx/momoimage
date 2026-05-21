@@ -116,6 +116,7 @@ upload.post("/", async (c) => {
     // 缩略图物理保存逻辑
     let hasThumbnail = false;
     let thumbnailKey = "";
+    let thumbnailSize = 0;
     if (thumbnail instanceof File) {
       const lastDotIndex = key.lastIndexOf(".");
       thumbnailKey = lastDotIndex !== -1 
@@ -129,6 +130,7 @@ upload.post("/", async (c) => {
           originalName: `thumb_${file.name}`,
         },
       });
+      thumbnailSize = thumbnail.size;
       hasThumbnail = true;
     }
 
@@ -143,6 +145,7 @@ upload.post("/", async (c) => {
       storageId: finalStorageId,
       url: result.url,
       thumbnailUrl: hasThumbnail ? `${siteUrl}/i/${thumbnailKey}` : undefined,
+      thumbnailSize: hasThumbnail ? thumbnailSize : undefined,
       folderId: folderId || undefined,
     };
 

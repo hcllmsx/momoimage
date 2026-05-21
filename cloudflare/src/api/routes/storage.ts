@@ -34,7 +34,13 @@ storage.get("/", async (c) => {
         if (meta && typeof meta === "object") {
           const m = meta as any;
           const sId = m.storageId || "local-r2";
-          const size = m.size || 0;
+          let size = m.size || 0;
+          if (m.thumbnailSize !== undefined) {
+            size += m.thumbnailSize;
+          } else if (m.thumbnailUrl) {
+            // 兼容之前已上传但未记录 thumbnailSize 的老图片，降级使用 50KB
+            size += 50 * 1024;
+          }
           if (usedSizes[sId] !== undefined) {
             usedSizes[sId] += size;
             fileCounts[sId] += 1;

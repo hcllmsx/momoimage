@@ -114,22 +114,31 @@ export function UploadZone({
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
 
-  // 获取全部文件夹 and 已启用存储列表
-  useEffect(() => {
-    api.getFolders().then(setFolders).catch(console.error);
-    
-    api.getStorageConfigs().then((configs) => {
+  const loadStorages = useCallback(async () => {
+    try {
+      const configs = await api.getStorageConfigs();
       const enabledStorages = configs.filter((c) => c.enabled);
       setStorages(enabledStorages);
       
-      const defaultStorage = enabledStorages.find((c) => c.isDefault);
-      if (defaultStorage) {
-        setSelectedStorageId(defaultStorage.id);
-      } else if (enabledStorages.length > 0) {
-        setSelectedStorageId(enabledStorages[0].id);
-      }
-    }).catch(console.error);
+      setSelectedStorageId((prev) => {
+        if (prev && enabledStorages.some((s) => s.id === prev)) {
+          return prev;
+        }
+        const defaultStorage = enabledStorages.find((c) => c.isDefault);
+        if (defaultStorage) return defaultStorage.id;
+        if (enabledStorages.length > 0) return enabledStorages[0].id;
+        return "";
+      });
+    } catch (err) {
+      console.error("加载存储后端失败", err);
+    }
   }, []);
+
+  // 获取全部文件夹 and 已启用存储列表
+  useEffect(() => {
+    api.getFolders().then(setFolders).catch(console.error);
+    loadStorages();
+  }, [loadStorages]);
 
   const handleFolderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
@@ -269,6 +278,7 @@ export function UploadZone({
 
     setIsUploading(false);
     if (results.length > 0) {
+      loadStorages().catch(console.error);
       if (results.length === 1) {
         // 单张图片上传成功，特意延迟 250ms 弹出详情弹窗，留足时间给眼睛感受绿光充满的解压动效
         setTimeout(() => {
@@ -278,7 +288,7 @@ export function UploadZone({
         onUploadSuccess(results);
       }
     }
-  }, [uploads, onUploadSuccess, showToast, selectedFolderId, selectedStorageId]);
+  }, [uploads, onUploadSuccess, showToast, selectedFolderId, selectedStorageId, loadStorages]);
 
   const handleRemoveItem = useCallback((id: string) => {
     setUploads((prev) => prev.filter((u) => u.id !== id));
@@ -389,6 +399,55 @@ export function UploadZone({
           </select>
         </div>
       </div>
+
+      {(() => {
+        const currentStorage = storages.find((s) => s.id === selectedStorageId);
+        if (!currentStorage || currentStorage.warningThresholdValue === undefined || currentStorage.warningThresholdValue === null) {
+          return null;
+        }
+
+        const value = currentStorage.warningThresholdValue;
+        const unit = currentStorage.warningThresholdUnit || "GB";
+        const used = currentStorage.usedSize || 0;
+
+        const thresholdBytes = value * (unit === "MB" ? 1024 * 1024 : 1024 * 1024 * 1024);
+        const ratio = used / thresholdBytes;
+
+        if (ratio < 0.9) return null;
+
+        const isExceeded = ratio >= 1.0;
+        const pctStr = Math.min(ratio * 100, 100).toFixed(1);
+
+        const bg = isExceeded ? "rgba(239, 68, 68, 0.08)" : "rgba(245, 158, 11, 0.08)";
+        const border = isExceeded ? "1px solid rgba(239, 68, 68, 0.2)" : "1px solid rgba(245, 158, 11, 0.2)";
+        const color = isExceeded ? "var(--color-danger)" : "#d97706";
+        const title = isExceeded ? "⚠️ 存储空间已耗尽" : "⚠️ 存储空间即将耗尽";
+        const text = isExceeded
+          ? `当前启用的存储 "${currentStorage.name}" 已使用空间为 ${formatFileSize(used)}，已超过设置的额度限制 ${value} ${unit}。继续上传可能会失败，建议添加并切换至其他存储。`
+          : `当前启用的存储 "${currentStorage.name}" 已使用空间为 ${formatFileSize(used)}，即将达到设置的额度限制 ${value} ${unit} (当前已使用 ${pctStr}%)。建议提前关注并准备切换至其他存储。`;
+
+        return (
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+            padding: "12px 16px",
+            background: bg,
+            border: border,
+            borderRadius: "var(--radius-md)",
+            marginBottom: 16,
+            fontSize: 13,
+            lineHeight: "1.6",
+            color: "var(--color-text-secondary)",
+            boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+            transition: "all var(--transition-normal)",
+            backdropFilter: "blur(4px)"
+          }}>
+            <span style={{ fontWeight: 600, color: color }}>{title}</span>
+            <span style={{ opacity: 0.9 }}>{text}</span>
+          </div>
+        );
+      })()}
 
       <div
         className={`upload-zone ${dragover ? "upload-zone--dragover" : ""}`}

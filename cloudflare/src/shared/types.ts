@@ -26,6 +26,8 @@ export interface ImageMeta {
   url: string;
   /** 缩略图公开访问 URL */
   thumbnailUrl?: string;
+  /** 缩略图文件大小（字节） */
+  thumbnailSize?: number;
   /** 所属文件夹 ID */
   folderId?: string;
 }
@@ -79,6 +81,10 @@ export interface StorageConfig {
   usedSize?: number;
   /** 已存文件数量（后端计算返回） */
   fileCount?: number;
+  /** 空间限额预警数值 */
+  warningThresholdValue?: number;
+  /** 空间限额预警单位 */
+  warningThresholdUnit?: "MB" | "GB";
 }
 
 /** API Token */
