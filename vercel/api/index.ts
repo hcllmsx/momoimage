@@ -226,4 +226,8 @@ app.get("*", async (c) => {
   return c.text("Not Found", 404);
 });
 
+export const config = {
+  runtime: "edge",
+};
+
 export default handle(app);
