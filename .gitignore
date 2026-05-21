@@ -4,4 +4,4 @@ dist/
 .dev.vars
 *.local
 *.log
-.trae/
+*log*.json
