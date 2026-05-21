@@ -166,10 +166,11 @@ export default function App() {
     }
   };
 
-  const handleCreateFolder = async (name: string) => {
+  const handleCreateFolder = async (name: string): Promise<Folder> => {
     const newFolder = await api.createFolder(name);
     setFolders((prev) => [...prev, newFolder]);
     showToast(`分类 "${name}" 创建成功`, "success");
+    return newFolder;
   };
 
   const handleDeleteFolder = async (id: string) => {

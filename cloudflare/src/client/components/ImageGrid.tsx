@@ -33,7 +33,7 @@ export function ImageGrid({
   folders: Folder[];
   currentFolderId: string | null;
   onFolderChange: (id: string | null) => void;
-  onCreateFolder: (name: string) => Promise<void>;
+  onCreateFolder: (name: string) => Promise<Folder>;
   onDeleteFolder: (id: string) => Promise<void>;
   onMoveImage: (id: string, folderId: string | null) => Promise<void>;
   onMoveMultiple: (ids: string[], folderId: string | null) => Promise<void>;
@@ -46,6 +46,14 @@ export function ImageGrid({
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+
+  // 新增：解散分类与单张删除弹窗状态
+  const [isDeletingFolder, setIsDeletingFolder] = useState(false);
+  const [deletingImage, setDeletingImage] = useState<ImageMeta | null>(null);
+
+  // 新增：移动弹窗中的就地新建分类状态
+  const [isCreatingInMove, setIsCreatingInMove] = useState(false);
+  const [newFolderInMoveName, setNewFolderInMoveName] = useState("");
 
   // 批量操作相关的状态
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
@@ -76,14 +84,45 @@ export function ImageGrid({
     }
   };
 
-  const handleDeleteCurrentFolder = async () => {
+  const handleDeleteCurrentFolder = () => {
+    setIsDeletingFolder(true);
+  };
+
+  const handleConfirmDeleteFolder = async () => {
     if (!currentFolderId) return;
-    if (confirm(`确定要删除分类 "${currentFolder?.name}" 吗？\n注意：此操作并不会删除里面的图片文件，图片将会安全移回根目录。`)) {
-      try {
-        await onDeleteFolder(currentFolderId);
-      } catch (err) {
-        showToast(err instanceof Error ? err.message : "删除失败", "error");
+    setIsDeletingFolder(false);
+    try {
+      await onDeleteFolder(currentFolderId);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "解散失败", "error");
+    }
+  };
+
+  const handleConfirmSingleDelete = async () => {
+    if (!deletingImage) return;
+    const targetId = deletingImage.id;
+    setDeletingImage(null);
+    try {
+      await onDelete(targetId);
+      showToast("图片已成功删除", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "删除失败", "error");
+    }
+  };
+
+  const handleCreateFolderInMove = async (isBatch: boolean) => {
+    if (!newFolderInMoveName || !newFolderInMoveName.trim()) return;
+    try {
+      const folder = await onCreateFolder(newFolderInMoveName.trim());
+      setIsCreatingInMove(false);
+      setNewFolderInMoveName("");
+      if (isBatch) {
+        await handleConfirmBatchMove(folder.id);
+      } else {
+        await handleConfirmMove(folder.id);
       }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "创建分类失败", "error");
     }
   };
 
@@ -214,12 +253,6 @@ export function ImageGrid({
             <>
               {currentFolderId ? (
                 <>
-                  <button
-                    className="btn btn--ghost btn--sm"
-                    onClick={() => onFolderChange(null)}
-                  >
-                    ⬅️ 返回根目录
-                  </button>
                   <button
                     className="btn btn--danger btn--sm"
                     onClick={handleDeleteCurrentFolder}
@@ -419,9 +452,7 @@ export function ImageGrid({
                         className="btn btn--ghost btn--sm btn--delete"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm("确定要删除这张图片吗？")) {
-                            onDelete(image.id);
-                          }
+                          setDeletingImage(image);
                         }}
                         style={{ minWidth: 32, padding: 0 }}
                       >
@@ -472,7 +503,7 @@ export function ImageGrid({
           justifyContent: "center",
           zIndex: 1000,
           backdropFilter: "blur(4px)",
-        }} onClick={() => setMovingImageId(null)}>
+        }} onClick={() => { setMovingImageId(null); setIsCreatingInMove(false); setNewFolderInMoveName(""); }}>
           <div className="card" style={{
             width: "100%",
             maxWidth: 360,
@@ -517,11 +548,79 @@ export function ImageGrid({
                   📁 {f.name}
                 </button>
               ))}
+
+              {!isCreatingInMove ? (
+                <button
+                  className="btn btn--ghost"
+                  style={{
+                    textAlign: "left",
+                    justifyContent: "flex-start",
+                    padding: "10px 14px",
+                    border: "1px dashed var(--color-primary)",
+                    color: "var(--color-primary)",
+                    marginTop: 4,
+                  }}
+                  onClick={() => setIsCreatingInMove(true)}
+                >
+                  ➕ 新建分类...
+                </button>
+              ) : (
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  padding: "8px 12px",
+                  border: "1px dashed var(--color-primary)",
+                  borderRadius: "var(--radius-sm)",
+                  marginTop: 4,
+                }}>
+                  <input
+                    type="text"
+                    placeholder="请输入新分类名称"
+                    value={newFolderInMoveName}
+                    onChange={(e) => setNewFolderInMoveName(e.target.value)}
+                    autoFocus
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "var(--radius-sm)",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-bg-input)",
+                      color: "var(--color-text)",
+                      width: "100%",
+                      outline: "none",
+                      fontSize: 13,
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCreateFolderInMove(false);
+                    }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                    <button
+                      className="btn btn--ghost btn--sm"
+                      style={{ padding: "2px 8px", fontSize: 12, height: "auto" }}
+                      onClick={() => {
+                        setIsCreatingInMove(false);
+                        setNewFolderInMoveName("");
+                      }}
+                    >
+                      取消
+                    </button>
+                    <button
+                      className="btn btn--primary btn--sm"
+                      style={{ padding: "2px 8px", fontSize: 12, height: "auto" }}
+                      onClick={() => handleCreateFolderInMove(false)}
+                      disabled={!newFolderInMoveName || !newFolderInMoveName.trim()}
+                    >
+                      创建并移动
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
               <button
                 className="btn btn--ghost btn--sm"
-                onClick={() => setMovingImageId(null)}
+                onClick={() => { setMovingImageId(null); setIsCreatingInMove(false); setNewFolderInMoveName(""); }}
                 style={{ padding: "6px 16px" }}
               >
                 取消
@@ -635,7 +734,7 @@ export function ImageGrid({
           justifyContent: "center",
           zIndex: 1001,
           backdropFilter: "blur(4px)",
-        }} onClick={() => setIsBatchMoving(false)}>
+        }} onClick={() => { setIsBatchMoving(false); setIsCreatingInMove(false); setNewFolderInMoveName(""); }}>
           <div className="card" style={{
             width: "100%",
             maxWidth: 360,
@@ -676,11 +775,79 @@ export function ImageGrid({
                   📁 {f.name}
                 </button>
               ))}
+
+              {!isCreatingInMove ? (
+                <button
+                  className="btn btn--ghost"
+                  style={{
+                    textAlign: "left",
+                    justifyContent: "flex-start",
+                    padding: "10px 14px",
+                    border: "1px dashed var(--color-primary)",
+                    color: "var(--color-primary)",
+                    marginTop: 4,
+                  }}
+                  onClick={() => setIsCreatingInMove(true)}
+                >
+                  ➕ 新建分类...
+                </button>
+              ) : (
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  padding: "8px 12px",
+                  border: "1px dashed var(--color-primary)",
+                  borderRadius: "var(--radius-sm)",
+                  marginTop: 4,
+                }}>
+                  <input
+                    type="text"
+                    placeholder="请输入新分类名称"
+                    value={newFolderInMoveName}
+                    onChange={(e) => setNewFolderInMoveName(e.target.value)}
+                    autoFocus
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "var(--radius-sm)",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-bg-input)",
+                      color: "var(--color-text)",
+                      width: "100%",
+                      outline: "none",
+                      fontSize: 13,
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCreateFolderInMove(true);
+                    }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                    <button
+                      className="btn btn--ghost btn--sm"
+                      style={{ padding: "2px 8px", fontSize: 12, height: "auto" }}
+                      onClick={() => {
+                        setIsCreatingInMove(false);
+                        setNewFolderInMoveName("");
+                      }}
+                    >
+                      取消
+                    </button>
+                    <button
+                      className="btn btn--primary btn--sm"
+                      style={{ padding: "2px 8px", fontSize: 12, height: "auto" }}
+                      onClick={() => handleCreateFolderInMove(true)}
+                      disabled={!newFolderInMoveName || !newFolderInMoveName.trim()}
+                    >
+                      创建并移动
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
               <button
                 className="btn btn--ghost btn--sm"
-                onClick={() => setIsBatchMoving(false)}
+                onClick={() => { setIsBatchMoving(false); setIsCreatingInMove(false); setNewFolderInMoveName(""); }}
                 style={{ padding: "6px 16px" }}
               >
                 取消
@@ -777,8 +944,8 @@ export function ImageGrid({
               maxWidth: "90%",
               maxHeight: "85%",
               objectFit: "contain",
-              borderRadius: "var(--radius-lg)",
-              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.15)",
+              borderRadius: "0",
+              boxShadow: "none",
               cursor: "default",
               animation: "scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
             }}
@@ -897,6 +1064,108 @@ export function ImageGrid({
               <button
                 className="btn btn--danger btn--sm"
                 onClick={handleConfirmBatchDelete}
+                style={{ padding: "6px 16px" }}
+              >
+                确认删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 解散虚拟分类确认弹窗 */}
+      {isDeletingFolder && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1001,
+          backdropFilter: "blur(4px)",
+        }} onClick={() => setIsDeletingFolder(false)}>
+          <div className="card" style={{
+            width: "100%",
+            maxWidth: 380,
+            padding: 24,
+            background: "var(--color-bg-surface)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--color-border)",
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.4)",
+          }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--color-danger)" }}>
+              <span>⚠️</span> 确认解散分类
+            </h3>
+            <p style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.5, margin: 0 }}>
+              确定要解散分类文件夹 <strong>{currentFolder?.name}</strong> 吗？<br />
+              解散分类不会删除分类内的图片，图片会自动转移到根目录。
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 24 }}>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => setIsDeletingFolder(false)}
+                style={{ padding: "6px 16px" }}
+              >
+                取消
+              </button>
+              <button
+                className="btn btn--danger btn--sm"
+                onClick={handleConfirmDeleteFolder}
+                style={{ padding: "6px 16px" }}
+              >
+                确认解散
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 单张图片删除确认弹窗 */}
+      {deletingImage && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1001,
+          backdropFilter: "blur(4px)",
+        }} onClick={() => setDeletingImage(null)}>
+          <div className="card" style={{
+            width: "100%",
+            maxWidth: 380,
+            padding: 24,
+            background: "var(--color-bg-surface)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--color-border)",
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.4)",
+          }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--color-danger)" }}>
+              <span>⚠️</span> 确认删除图片
+            </h3>
+            <p style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.5, margin: 0 }}>
+              确定要删除图片 <strong>{deletingImage.originalName}</strong> 吗？<br />
+              此操作将物理删除云端存储中的图片，<strong>无法恢复！</strong>
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 24 }}>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => setDeletingImage(null)}
+                style={{ padding: "6px 16px" }}
+              >
+                取消
+              </button>
+              <button
+                className="btn btn--danger btn--sm"
+                onClick={handleConfirmSingleDelete}
                 style={{ padding: "6px 16px" }}
               >
                 确认删除
