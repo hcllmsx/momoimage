@@ -8,9 +8,8 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@shared": fileURLToPath(new URL("./src/shared", import.meta.url)),
-      "@api": fileURLToPath(new URL("./src/api", import.meta.url)),
-      "@client": fileURLToPath(new URL("./src/client", import.meta.url)),
+      "@shared": fileURLToPath(new URL("./api/shared", import.meta.url)),
+      "@client": fileURLToPath(new URL("./client", import.meta.url)),
     },
   },
   server: {

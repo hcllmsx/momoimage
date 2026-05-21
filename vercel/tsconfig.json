@@ -13,11 +13,10 @@
     "noEmit": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "paths": {
-      "@shared/*": ["./src/shared/*"],
-      "@api/*": ["./src/api/*"],
-      "@client/*": ["./src/client/*"]
+      "@shared/*": ["./api/shared/*"],
+      "@client/*": ["./client/*"]
     }
   },
-  "include": ["src/**/*", "api/**/*"],
+  "include": ["client/**/*", "api/**/*"],
   "exclude": ["node_modules"]
 }

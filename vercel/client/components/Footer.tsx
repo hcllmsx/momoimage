@@ -2,7 +2,7 @@
 // 默默图床 — 页脚组件
 // ============================================
 
-import packageInfo from "../../../package.json";
+import packageInfo from "../../package.json";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
