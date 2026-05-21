@@ -2,7 +2,7 @@
 // 默默图床 — 存储适配器接口定义
 // ============================================
 
-import type { StorageType } from "../../shared/types";
+import type { StorageType } from "../shared/types";
 
 /** 上传选项 */
 export interface PutOptions {

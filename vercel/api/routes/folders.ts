@@ -4,7 +4,7 @@
 
 import { Hono } from "hono";
 import { kvGetJSON, kvSet, kvDel } from "../lib/kv";
-import type { Folder, ImageMeta } from "../../shared/types";
+import type { Folder, ImageMeta } from "../shared/types";
 
 const folders = new Hono<{ Bindings: Env }>();
 

@@ -3,7 +3,7 @@
 // ============================================
 
 import { Hono } from "hono";
-import type { ImageMeta, PaginatedResult } from "../../shared/types";
+import type { ImageMeta, PaginatedResult } from "../shared/types";
 import { kvGetJSON, kvSet, kvDel } from "../lib/kv";
 import { StorageManager } from "../storage/manager";
 
