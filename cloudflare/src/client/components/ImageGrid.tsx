@@ -478,19 +478,22 @@ export function ImageGrid({
                   </div>
                   {(() => {
                     const config = getStorageInfo(image.storageId);
-                    if (!config?.color) return null;
+                    const dotColor = config?.color || "#9CA3AF";
+                    const isLocal = image.storageId === "local-r2" || !image.storageId;
+                    const defaultName = isLocal ? "本地内置存储" : "外部存储";
+                    const storageName = config?.name || defaultName;
                     return (
                       <div
                         style={{
                           width: 10,
                           height: 10,
                           borderRadius: "50%",
-                          backgroundColor: config.color,
+                          backgroundColor: dotColor,
                           flexShrink: 0,
-                          border: "1px solid rgba(0, 0, 0, 0.1)",
-                          boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                          border: "1px solid var(--color-border)",
+                          boxShadow: "0 1px 2px rgba(0, 0, 0, 0.15)",
                         }}
-                        title={`存储位置: ${config.name}`}
+                        title={`存储位置: ${storageName}`}
                       />
                     );
                   })()}
