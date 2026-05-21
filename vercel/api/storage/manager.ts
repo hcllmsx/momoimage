@@ -58,6 +58,7 @@ export class StorageManager {
         enabled: savedLocalBlob ? savedLocalBlob.enabled : true,
         warningThresholdValue: savedLocalBlob?.warningThresholdValue,
         warningThresholdUnit: savedLocalBlob?.warningThresholdUnit,
+        color: savedLocalBlob?.color,
       };
       this.configs.push(localBlobConfig);
       const { VercelBlobAdapter } = await import("./vercel-blob");

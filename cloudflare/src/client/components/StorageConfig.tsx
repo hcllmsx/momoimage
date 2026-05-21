@@ -248,7 +248,7 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
   const [blobToken, setBlobToken] = useState(config?.vercelBlobConfig?.token || "");
 
   // 颜色标签字段
-  const [color, setColor] = useState(config?.color || "#3B82F6");
+  const [color, setColor] = useState(config?.color || "#9CA3AF");
 
   // 解析 R2 完整链接的工具函数
   const parseR2Url = (url: string) => {
@@ -470,13 +470,13 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
             <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>存储标签颜色（可选）</label>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minHeight: 38 }}>
               {[
+                { hex: "#9CA3AF", name: "灰色" },
                 { hex: "#3B82F6", name: "蓝色" },
                 { hex: "#10B981", name: "绿色" },
                 { hex: "#8B5CF6", name: "紫色" },
                 { hex: "#F59E0B", name: "橙色" },
                 { hex: "#EF4444", name: "红色" },
-                { hex: "#EC4899", name: "粉色" },
-                { hex: "#6B7280", name: "灰色" }
+                { hex: "#EC4899", name: "粉色" }
               ].map((preset) => {
                 const isSelected = color === preset.hex;
                 return (

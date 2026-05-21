@@ -59,6 +59,7 @@ export class StorageManager {
         enabled: savedLocalR2 ? savedLocalR2.enabled : true,
         warningThresholdValue: savedLocalR2?.warningThresholdValue,
         warningThresholdUnit: savedLocalR2?.warningThresholdUnit,
+        color: savedLocalR2?.color,
       };
       this.configs.push(localR2Config);
       this.adapters.set(
