@@ -242,7 +242,7 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) { showToast("请输入显示名称", "error"); return; }
+    if (!isLocal && !name.trim()) { showToast("请输入显示名称", "error"); return; }
     setLoading(true);
 
     try {
@@ -375,37 +375,41 @@ function StorageForm({ config, onSaved }: StorageFormProps) {
   return (
     <form onSubmit={handleSubmit} style={{ marginBottom: 20, padding: 16, background: "var(--color-bg-surface)", borderRadius: "var(--radius-md)" }}>
       <div style={{ display: "grid", gap: 12 }}>
-        <div>
-          <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>接入供应商 / 协议</label>
-          <select
-            className="input"
-            value={isLocal ? config!.type : provider}
-            onChange={(e) => {
-              const val = e.target.value as any;
-              setProvider(val);
-              if (val === "oracle") {
-                if (region === "auto") {
-                  setRegion("");
-                }
-              } else if (val === "r2-external" || val === "s3-general") {
-                if (!region) {
-                  setRegion("auto");
-                }
-              }
-            }}
-            disabled={isEdit || isLocal}
-          >
-            {isLocal && <option value={config!.type}>本地内置存储 ({config!.type === "r2-binding" ? "Cloudflare R2" : "Vercel Blob"})</option>}
-            <option value="r2-external">Cloudflare R2（外部账号）</option>
-            <option value="oracle">甲骨文云 OCI 对象存储</option>
-            <option value="s3-general">AWS S3 / 其他 S3 兼容存储</option>
-            <option value="vercel-blob">Vercel Blob</option>
-          </select>
-        </div>
-        <div>
-          <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>显示名称</label>
-          <input className="input" placeholder="如：甲骨文云免费存储" value={name} onChange={(e) => setName(e.target.value)} disabled={isLocal} />
-        </div>
+        {!isLocal && (
+          <>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>接入供应商 / 协议</label>
+              <select
+                className="input"
+                value={isLocal ? config!.type : provider}
+                onChange={(e) => {
+                  const val = e.target.value as any;
+                  setProvider(val);
+                  if (val === "oracle") {
+                    if (region === "auto") {
+                      setRegion("");
+                    }
+                  } else if (val === "r2-external" || val === "s3-general") {
+                    if (!region) {
+                      setRegion("auto");
+                    }
+                  }
+                }}
+                disabled={isEdit || isLocal}
+              >
+                {isLocal && <option value={config!.type}>本地内置存储 ({(config!.type as string) === "r2-binding" ? "Cloudflare R2" : "Vercel Blob"})</option>}
+                <option value="r2-external">Cloudflare R2（外部账号）</option>
+                <option value="oracle">甲骨文云 OCI 对象存储</option>
+                <option value="s3-general">AWS S3 / 其他 S3 兼容存储</option>
+                <option value="vercel-blob">Vercel Blob</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>显示名称</label>
+              <input className="input" placeholder="如：甲骨文云免费存储" value={name} onChange={(e) => setName(e.target.value)} disabled={isLocal} />
+            </div>
+          </>
+        )}
         <div>
           <label style={{ fontSize: 13, fontWeight: 500, display: "block", marginBottom: 4 }}>空间限额预警（可选）</label>
           <div style={{ display: "flex", gap: 8 }}>
