@@ -5,3 +5,4 @@ dist/
 *.local
 *.log
 *log*.json
+.vercel/
