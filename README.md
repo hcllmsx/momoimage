@@ -1,10 +1,10 @@
-# 默默图床 (MomoImage) 📸
+# 默默图床 (MomoImage)
 
 默默图床是一个现代化、全栈图片托管系统。项目提供 **Cloudflare** 与 **Vercel** 两套完全独立的部署方案，全量支持虚拟分类、強缓存直链、多存储后端管理以及 API 开放上传。
 
 ---
 
-## 🛠️ 1. Cloudflare 版本部署步骤
+## 1. Cloudflare 版本部署步骤
 
 Cloudflare 版代码管理在 `cloudflare/` 目录下。
 
@@ -52,7 +52,7 @@ Cloudflare 版代码管理在 `cloudflare/` 目录下。
 
 ---
 
-## 🔺 2. Vercel 版本部署步骤
+## 2. Vercel 版本部署步骤
 
 Vercel 版代码管理在 `vercel/` 目录下。
 
@@ -90,7 +90,7 @@ Vercel 版代码管理在 `vercel/` 目录下。
 
 ---
 
-## 🔒 3. 核心环境变量对照表
+## 3. 核心环境变量对照表
 
 无论部署在哪个平台，请根据需求在控制面板的环境变量设置中提供以下核心变量：
 
@@ -103,6 +103,6 @@ Vercel 版代码管理在 `vercel/` 目录下。
 
 ---
 
-## ⚖️ 许可
+## 许可
 
 MIT License.
