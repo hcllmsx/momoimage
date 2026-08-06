@@ -4,34 +4,64 @@
 
 ---
 
+## 0. 本地开发与版本管理
+
+项目根目录的 `VERSION` 文件是版本号唯一来源（semver，如 `1.5.21`）。两个子项目的 `package.json`、`package-lock.json` 以及页脚显示的版本号都由它驱动。
+
+### 一键启动本地开发
+
+在**项目根目录**任选其一：
+
+```bash
+npm run dev:cf        # Cloudflare 版：wrangler(8787) + vite(5173)
+npm run dev:vercel    # Vercel 版：  vercel(3000)  + vite(5173)
+```
+
+脚本会自动完成：
+1. **同步版本号** — 读 `VERSION`，同步到所有 `package.json` / `package-lock.json`
+2. **并行启动后端与前端** — 后端跑 API，前端跑 Vite 热更新
+3. **浏览器访问** `http://localhost:5173` 即可（Vite 自动代理 `/api` 到后端）
+4. **Ctrl+C 一次性退出**所有进程
+
+> Vercel 版首次运行前需在 `vercel/` 目录执行一次 `vercel link` 关联项目，之后即可用根目录脚本启动。
+
+### 发版 / 改版本号
+
+1. 修改根目录 `VERSION` 文件为新版本号
+2. 运行 `npm run sync`（或任意 `dev` / `build` 命令，会自动先同步）
+3. 提交 `VERSION` 及被脚本更新过的 `package.json` / `package-lock.json`
+
+### 其他命令
+
+```bash
+npm run sync          # 手动同步版本号
+npm run sync:check    # 仅校验（CI 用，不一致时退出码非 0）
+npm run build:cf      # 构建 Cloudflare 前端
+npm run build:vercel  # 构建 Vercel 前端
+npm run deploy:cf     # 部署 Cloudflare Worker
+```
+
+---
+
 ## 1. Cloudflare 版本部署步骤
 
 Cloudflare 版代码管理在 `cloudflare/` 目录下。
 
 ### 本地部署与开发预览
-本地联调开发有两种方式：
 
-* **方式 A：纯预览/日常使用（单端口）**
-  1. 进入 `cloudflare` 目录安装依赖：
-     ```bash
-     npm install
-     ```
-  2. 启动本地 Wrangler 模拟环境：
-     ```bash
-     npx wrangler dev
-     ```
-  3. 直接在浏览器打开控制台输出的端口地址（通常为 `http://localhost:8787`）即可。系统会自动托管打包好的静态前端页面与本地模拟 KV/R2。
+在项目根目录执行：
 
-* **方式 B：前端开发热更新（双端口，推荐在需要修改前端代码时使用）**
-  1. 终端 1 启动后端 Worker 服务（监听 8787 端口）：
-     ```bash
-     npx wrangler dev
-     ```
-  2. 终端 2 启动前端 Vite 调试服务器（监听 5173 端口）：
-     ```bash
-     npm run dev
-     ```
-  3. 浏览器访问 `http://localhost:5173`。Vite 会自动将 `/api` 的接口请求代理至 `8787` 后端。
+```bash
+npm run dev:cf
+```
+
+脚本会自动同步版本号，然后在 `cloudflare/` 目录并行启动：
+- **后端** Wrangler dev（`http://localhost:8787`，本地模拟 KV/R2）
+- **前端** Vite dev（`http://localhost:5173`，热更新）
+
+浏览器访问 `http://localhost:5173` 即可，Vite 会自动将 `/api` 请求代理至 8787 后端。按 `Ctrl+C` 一次性退出所有服务。
+
+> 首次运行前请在 `cloudflare/` 目录执行一次 `npm install` 安装依赖。
 
 ---
 
@@ -57,19 +87,20 @@ Cloudflare 版代码管理在 `cloudflare/` 目录下。
 Vercel 版代码管理在 `vercel/` 目录下。
 
 ### 本地部署与开发预览
-1. 全局安装 Vercel CLI 工具：
-   ```bash
-   npm install -g vercel
-   ```
-2. 进入 `vercel` 目录安装依赖：
-   ```bash
-   npm install
-   ```
-3. 关联项目并启动本地 Serverless 仿真环境：
-   ```bash
-   vercel dev
-   ```
-   *注意：`vercel dev` 本地调试时，会从您绑定的云端拉取环境变量与存储连接信息。本地上传和读写数据会实时作用于您绑定的真实 Vercel KV 和 Vercel Blob。*
+
+在项目根目录执行：
+
+```bash
+npm run dev:vercel
+```
+
+脚本会自动同步版本号，然后在 `vercel/` 目录并行启动：
+- **后端** Vercel dev（`http://localhost:3000`，从云端拉取环境变量与存储连接）
+- **前端** Vite dev（`http://localhost:5173`，热更新）
+
+浏览器访问 `http://localhost:5173` 即可，Vite 会自动将 `/api` 请求代理至 3000 后端。按 `Ctrl+C` 一次性退出所有服务。
+
+> 首次运行前需在 `vercel/` 目录执行一次 `npm install` 与 `vercel link`（关联项目，用于拉取环境变量）。`vercel dev` 本地上传和读写会实时作用于您绑定的真实 Vercel KV 和 Vercel Blob。
 
 ---
 

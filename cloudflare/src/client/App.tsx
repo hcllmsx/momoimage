@@ -263,7 +263,7 @@ export default function App() {
               isDefaultPassword={systemInfo?.isDefaultPassword}
             />
           </div>
-          <Footer />
+          <Footer version={systemInfo?.version} />
         </div>
         <ToastContainer toasts={toasts} onRemove={removeToast} />
       </ToastContext.Provider>
@@ -372,7 +372,7 @@ export default function App() {
           {activeTab === "storage" && <StorageConfig onConfigsChange={loadStorageConfigs} />}
         </main>
 
-        <Footer />
+        <Footer version={systemInfo?.version} />
 
         {/* 链接弹窗 */}
         {linkDialogData && (

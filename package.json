@@ -1,0 +1,16 @@
+{
+  "name": "momoimage-monorepo",
+  "private": true,
+  "description": "默默图床 — 根目录脚本与版本同步工具",
+  "type": "module",
+  "version": "26.8.7",
+  "scripts": {
+    "sync": "node scripts/sync-version.mjs",
+    "sync:check": "node scripts/sync-version.mjs --check",
+    "dev:cf": "node scripts/dev.mjs cf",
+    "dev:vercel": "node scripts/dev.mjs vercel",
+    "build:cf": "cd cloudflare && npm run build",
+    "build:vercel": "cd vercel && npm run build",
+    "deploy:cf": "cd cloudflare && npm run deploy"
+  }
+}
