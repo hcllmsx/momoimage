@@ -8,6 +8,15 @@ import type { Context } from "hono";
 import { kvGet, kvSet, kvGetJSON } from "../lib/kv";
 
 /**
+ * 模块级缓存：KV 不可用时保证同一进程内 JWT 密钥一致。
+ *
+ * 注意：Vercel edge runtime 在 vercel dev 下可能每次请求都冷启动，
+ * 模块级缓存不一定能跨请求生效。本地开发最可靠的方式是通过 JWT_SECRET
+ * 环境变量提供稳定密钥（scripts/dev.mjs 会自动注入）。
+ */
+let _devJwtSecret: string | null = null;
+
+/**
  * 获取 JWT 密钥：优先用环境变量，否则自动生成并存储到 KV
  * 这样用户不需要手动配置 JWT_SECRET
  */
@@ -30,12 +39,33 @@ export async function getJwtSecret(jwtSecretEnv?: string): Promise<string> {
     
     try {
       await kvSet(kvKey, secret);
+      console.log("[Auth] JWT secret generated and saved to KV");
     } catch (putErr) {
       console.error("[VercelKV] Failed to save auto-generated JWT secret:", putErr);
+      // 在本地开发环境中，KV 保存失败时缓存到模块级变量并返回
+      if (process.env.VERCEL_ENV === "development" || process.env.NODE_ENV === "development") {
+        console.warn("[Auth] Running in development mode, using in-memory JWT secret");
+        _devJwtSecret = secret;
+        return secret;
+      }
     }
     return secret;
   } catch (getErr) {
     console.error("[VercelKV] Failed to read JWT secret from KV:", getErr);
+    
+    // 本地开发环境容错：如果 KV 读取失败，复用模块级缓存的临时密钥
+    // 首次调用时生成并缓存，后续请求复用同一密钥，避免 JWT 验证失败
+    if (process.env.VERCEL_ENV === "development" || process.env.NODE_ENV === "development") {
+      if (!_devJwtSecret) {
+        console.warn("[Auth] KV not available in development, generating temporary JWT secret (cached for process lifetime)");
+        const bytes = new Uint8Array(48);
+        crypto.getRandomValues(bytes);
+        _devJwtSecret = Array.from(bytes)
+          .map((b) => b.toString(36).padStart(2, "0"))
+          .join("");
+      }
+      return _devJwtSecret;
+    }
   }
 
   // 实在没有 KV 也没有环境变量，用一个固定备用值（不安全，仅用于防崩溃）

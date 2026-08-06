@@ -14,9 +14,15 @@ export default defineConfig({
     },
   },
   server: {
+    // 端口由 scripts/dev.mjs 通过 MOMO_VITE_PORT 环境变量注入
+    // 直接运行 npm run dev 时回退到 5173
+    port: Number(process.env.MOMO_VITE_PORT) || 5173,
+    strictPort: true,
     proxy: {
-      "/api": "http://localhost:8787",
-      "/i": "http://localhost:8787",
+      // 代理目标由 scripts/dev.mjs 通过 MOMO_API_PORT 环境变量注入
+      // 直接运行 npm run dev 时回退到 8787（wrangler 默认端口）
+      "/api": `http://localhost:${process.env.MOMO_API_PORT || 8787}`,
+      "/i": `http://localhost:${process.env.MOMO_API_PORT || 8787}`,
     },
   },
 });

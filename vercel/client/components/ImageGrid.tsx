@@ -50,6 +50,12 @@ export function ImageGrid({
     return storageConfigs?.find(c => c.id === id);
   };
 
+  // 复制文件夹 ID（供 PicList 等外部工具通过 ?folderId= 参数指定分类）
+  const handleCopyFolderId = async (id: string) => {
+    const ok = await copyToClipboard(id);
+    showToast(ok ? `文件夹 ID 已复制：${id}` : "复制失败", ok ? "success" : "error");
+  };
+
   // 弹窗状态
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -329,14 +335,38 @@ export function ImageGrid({
                 key={folder.id}
                 onClick={() => onFolderChange(folder.id)}
                 className="folder-card"
+                style={{ display: "flex", alignItems: "center", gap: 12 }}
               >
                 <span style={{ fontSize: 24 }}>📁</span>
-                <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 14, color: "var(--color-text)" }}>
                     {folder.name}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 4 }}>
                     {formatDate(folder.createdAt)}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", fontFamily: "monospace", marginTop: 4, display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>ID: {folder.id}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleCopyFolderId(folder.id); }}
+                      style={{
+                        padding: "1px 8px",
+                        fontSize: 11,
+                        background: "transparent",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: 4,
+                        color: "var(--color-text-secondary)",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        flexShrink: 0,
+                      }}
+                      title="复制文件夹 ID（用于 PicList 等工具的 ?folderId= 参数）"
+                      onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-primary)"; e.currentTarget.style.borderColor = "var(--color-primary)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; e.currentTarget.style.borderColor = "var(--color-border)"; }}
+                    >
+                      复制
+                    </button>
                   </div>
                 </div>
               </div>

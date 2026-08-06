@@ -5,7 +5,9 @@ dist/
 *.local
 *.log
 *log*.json
-.vercel/
+
 _temp/
-.vercel
+
 .env*
+
+vercel/.vercel

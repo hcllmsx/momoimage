@@ -6,6 +6,7 @@ import { DOMParser, Node } from "@xmldom/xmldom";
 (globalThis as any).DOMParser = DOMParser;
 (globalThis as any).Node = Node;
 
+import packageInfo from "../package.json";
 import { handle } from "hono/vercel";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -99,7 +100,7 @@ app.get("/api/info", async (c) => {
       siteUrl,
       hasCustomDomain: !isDefaultDomain,
       deployTarget: "vercel",
-      version: "1.0.0",
+      version: packageInfo.version,
       isDefaultPassword,
       isKvValid,
       isStorageValid,

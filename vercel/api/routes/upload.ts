@@ -3,7 +3,7 @@
 // ============================================
 
 import { Hono } from "hono";
-import type { ImageMeta, UploadResult } from "../shared/types";
+import type { ImageMeta, UploadResult, Folder } from "../shared/types";
 import { kvSet, kvGetJSON } from "../lib/kv";
 import { StorageManager } from "../storage/manager";
 
@@ -67,7 +67,36 @@ upload.post("/", async (c) => {
 
   // 获取指定的存储后端，或使用默认
   const storageId = c.req.query("storage");
-  const folderId = (c.req.query("folderId") || body["folderId"]) as string | undefined;
+  let folderId = (c.req.query("folderId") || body["folderId"]) as
+    | string
+    | undefined;
+
+  // 支持 folderName 参数：若未提供 folderId 但提供了 folderName，
+  // 则按名称查找已有文件夹，找不到则自动新建一个
+  const folderName = (c.req.query("folderName") || body["folderName"]) as
+    | string
+    | undefined;
+  if (!folderId && folderName && folderName.trim()) {
+    const folders = (await kvGetJSON<Folder[]>("momoimage:folders")) ?? [];
+    const existing = folders.find(
+      (f) => f.name.toLowerCase() === folderName.trim().toLowerCase()
+    );
+    if (existing) {
+      folderId = existing.id;
+    } else {
+      const newId = `folder-${Date.now().toString(36)}-${Math.random()
+        .toString(36)
+        .slice(2, 6)}`;
+      const newFolder: Folder = {
+        id: newId,
+        name: folderName.trim(),
+        createdAt: new Date().toISOString(),
+      };
+      folders.push(newFolder);
+      await kvSet("momoimage:folders", folders);
+      folderId = newId;
+    }
+  }
 
   let finalStorageId = storageId;
   if (!finalStorageId) {

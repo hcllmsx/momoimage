@@ -2,10 +2,10 @@
 // 默默图床 — 存储配置页面
 // ============================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { StorageConfig as StorageConfigType, StorageType } from "@shared/types";
 import * as api from "../lib/api";
-import { getStorageTypeName, formatFileSize } from "../lib/utils";
+import { getStorageTypeName, formatFileSize, copyToClipboard } from "../lib/utils";
 import { useToastContext } from "../App";
 
 export function StorageConfig({ onConfigsChange }: { onConfigsChange?: () => void }) {
@@ -81,6 +81,12 @@ export function StorageConfig({ onConfigsChange }: { onConfigsChange?: () => voi
     }
   };
 
+  // 复制存储 ID（供 PicList 等外部工具通过 ?storage= 参数指定存储后端）
+  const handleCopyId = async (id: string) => {
+    const ok = await copyToClipboard(id);
+    showToast(ok ? `存储 ID 已复制：${id}` : "复制失败", ok ? "success" : "error");
+  };
+
   if (loading) {
     return <div className="empty-state"><p>加载中...</p></div>;
   }
@@ -147,6 +153,28 @@ export function StorageConfig({ onConfigsChange }: { onConfigsChange?: () => voi
                           📊 已存容量: {formatFileSize(config.usedSize)}{config.warningThresholdValue !== undefined ? ` / ${config.warningThresholdValue} ${config.warningThresholdUnit}` : ""} ({config.fileCount} 张图片)
                         </span>
                       )}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", fontFamily: "monospace", marginTop: 4, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <span>ID: {config.id}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyId(config.id)}
+                        style={{
+                          padding: "1px 8px",
+                          fontSize: 11,
+                          background: "transparent",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: 4,
+                          color: "var(--color-text-secondary)",
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                        }}
+                        title="复制存储 ID（用于 PicList 等工具的 ?storage= 参数）"
+                        onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-primary)"; e.currentTarget.style.borderColor = "var(--color-primary)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; e.currentTarget.style.borderColor = "var(--color-border)"; }}
+                      >
+                        复制 ID
+                      </button>
                     </div>
                   </div>
                   <div className="storage-item__actions">
@@ -718,6 +746,7 @@ function TokenManager() {
   const [newTokenName, setNewTokenName] = useState("");
   const [loading, setLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [newToken, setNewToken] = useState<string | null>(null);
   const { showToast } = useToastContext();
 
   useEffect(() => {
@@ -729,9 +758,8 @@ function TokenManager() {
     setLoading(true);
     try {
       const token = await api.createApiToken(newTokenName.trim());
-      showToast("Token 已创建，请立即复制保存！", "success");
-      // 显示完整 token 值
-      alert(`API Token 已创建！请立即复制保存，关闭后无法再次查看：\n\n${token.token}`);
+      // 展示完整 token 值供用户复制（弹窗内可一键复制）
+      setNewToken(token.token);
       setNewTokenName("");
       // 刷新列表
       const list = await api.listApiTokens();
@@ -792,10 +820,6 @@ function TokenManager() {
         </div>
       </div>
       <div className="card__body">
-        <p style={{ fontSize: 13, color: "var(--color-text-tertiary)", marginBottom: 12 }}>
-          API Token 用于通过外部工具上传图片。使用方式：在请求头中添加 <code style={{ background: "var(--color-bg-surface)", padding: "2px 6px", borderRadius: 4 }}>Authorization: Token your-token-here</code>
-        </p>
-
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <input className="input" placeholder="Token 名称/备注" value={newTokenName} onChange={(e) => setNewTokenName(e.target.value)} style={{ flex: 1 }} />
           <button className="btn btn--primary" onClick={handleCreate} disabled={loading}>创建</button>
@@ -820,6 +844,161 @@ function TokenManager() {
       </div>
 
       {showHelp && <TokenHelpModal onClose={() => setShowHelp(false)} />}
+      {newToken && <TokenCreatedModal token={newToken} onClose={() => setNewToken(null)} />}
+    </div>
+  );
+}
+
+// ========= Token 创建成功弹窗（可一键复制） =========
+function TokenCreatedModal({ token, onClose }: { token: string; onClose: () => void }) {
+  const { showToast } = useToastContext();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(token);
+      showToast("Token 已复制到剪贴板", "success");
+    } catch {
+      // 回退方案：选中文本供用户手动 Ctrl+C
+      if (inputRef.current) {
+        inputRef.current.select();
+        try {
+          document.execCommand("copy");
+          showToast("Token 已复制到剪贴板", "success");
+        } catch {
+          showToast("复制失败，请手动选择文本复制", "error");
+        }
+      } else {
+        showToast("复制失败，请手动选择文本复制", "error");
+      }
+    }
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+        animation: "tokenFadeIn 0.2s ease",
+      }}
+    >
+      <style>{`
+        @keyframes tokenFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes tokenScaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      `}</style>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "90%",
+          maxWidth: "560px",
+          background: "var(--color-bg-elevated)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-lg)",
+          boxShadow: "var(--shadow-lg)",
+          padding: "28px 32px",
+          position: "relative",
+          animation: "tokenScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
+      >
+        {/* 头部图标 + 标题 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: "50%",
+            background: "var(--color-primary-subtle)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 20, flexShrink: 0,
+          }}>🔑</div>
+          <div>
+            <h2 style={{ fontSize: 17, fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
+              API Token 已创建
+            </h2>
+            <p style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginTop: 2, marginBottom: 0 }}>
+              请立即复制保存，关闭后将无法再次查看
+            </p>
+          </div>
+        </div>
+
+        {/* 警告条 */}
+        <div style={{
+          background: "rgba(245, 158, 11, 0.1)",
+          border: "1px solid rgba(245, 158, 11, 0.3)",
+          borderRadius: "var(--radius-sm)",
+          padding: "10px 14px",
+          marginBottom: 16,
+          fontSize: 12,
+          color: "var(--color-text-secondary)",
+          lineHeight: 1.5,
+        }}>
+          ⚠️ 出于安全考虑，完整 Token 仅在此次创建时展示一次。请立即复制并妥善保存。
+        </div>
+
+        {/* Token 输入框（可选中 + 一键复制） */}
+        <div style={{ position: "relative", marginBottom: 20 }}>
+          <input
+            ref={inputRef}
+            readOnly
+            value={token}
+            onClick={(e) => e.currentTarget.select()}
+            style={{
+              width: "100%",
+              padding: "12px 64px 12px 14px",
+              fontFamily: "SF Mono, Consolas, Monaco, monospace",
+              fontSize: 13,
+              background: "var(--color-bg-input)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              color: "var(--color-text-primary)",
+              outline: "none",
+              userSelect: "all",
+              boxSizing: "border-box",
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleCopy}
+            style={{
+              position: "absolute",
+              top: "50%",
+              transform: "translateY(-50%)",
+              right: 6,
+              padding: "6px 12px",
+              fontSize: 12,
+              fontWeight: 500,
+              background: "var(--color-primary)",
+              color: "var(--color-text-inverse)",
+              border: "none",
+              borderRadius: 4,
+              cursor: "pointer",
+              transition: "opacity 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+          >
+            复制
+          </button>
+        </div>
+
+        {/* 操作按钮 */}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button className="btn btn--primary" onClick={handleCopy} style={{ minWidth: 110 }}>
+            复制 Token
+          </button>
+          <button className="btn" onClick={onClose} style={{ minWidth: 80 }}>
+            关闭
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -838,9 +1017,11 @@ function TokenHelpModal({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const picgoJson = JSON.stringify({
+  const headersJson = JSON.stringify({
     "Authorization": "Token <您的 API Token>"
   }, null, 2);
+
+  const folderExample = `${origin}/api/upload?storage=<存储ID>&folderName=截图`;
 
   const pythonCode = `import requests
 
@@ -983,7 +1164,7 @@ print(response.json())`;
             <span>🔑</span> API Token 接入指南
           </h2>
           <p style={{ fontSize: 13, color: "var(--color-text-tertiary)", marginTop: 6 }}>
-            关于 API Token 的作用机制、常用图客工具（PicGo）配置与代码调用示例
+            PicList 配置教程、接口规范、存储/文件夹指定与代码调用示例
           </p>
         </div>
 
@@ -994,7 +1175,7 @@ print(response.json())`;
           <div className="help-section">
             <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>一、关于 API Token</h3>
             <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-              API Token 是默默图床提供的无状态会话安全密钥。它适用于在第三方图片上传工具（如 PicGo、PicList、自定义脚本等）中代替原本基于 JWT Session 的登录状态。API Token 一经生成便可以永久使用，删除后会立即失效。出于安全性考虑，生成的 API Token 只有在刚刚创建完成时会完整展示一次，后续无法再次查看。
+              API Token 是默默图床为外部工具（PicList、PicGo、脚本等）提供的调用密钥，用于代替网页登录态。认证方式：在请求头中携带 <code style={{ background: "var(--color-bg-surface)", padding: "2px 6px", borderRadius: 4 }}>Authorization: Token &lt;您的 Token&gt;</code>，<strong style={{ color: "var(--color-text-primary)" }}>"Token " 前缀不可省略</strong>，否则会返回 401。Token 一经生成永久有效，删除后立即失效；完整值仅在创建时展示一次。
             </p>
           </div>
 
@@ -1025,56 +1206,98 @@ print(response.json())`;
                 Authorization: Token &lt;您的 API Token&gt;
               </div>
 
-              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>请求体参数</div>
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>表单字段</div>
               <div style={{ color: "var(--color-text-secondary)", lineHeight: 1.4 }}>
-                <strong style={{ color: "var(--color-text-primary)" }}>file</strong>: File (必填，待上传的图片文件)<br />
-                <strong style={{ color: "var(--color-text-primary)" }}>folderId</strong>: String (可选，待上传到的目标分类文件夹ID)
+                <strong style={{ color: "var(--color-text-primary)" }}>file</strong>: File (必填，待上传的图片文件)
               </div>
+
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>返回路径</div>
+              <div style={{ fontFamily: "monospace", color: "var(--color-text-primary)" }}>data.url</div>
             </div>
           </div>
 
-          {/* 三、PicGo / PicList 接入配置 */}
+          {/* 三、PicList 配置教程 */}
           <div className="help-section">
-            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>三、PicGo / PicList 自定义图床配置教程</h3>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>三、PicList 配置教程</h3>
             <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, marginBottom: 12 }}>
-              在 PicGo 或 PicList 等第三方软件中，请在左侧边栏“图床设置”中选择 <strong>“自定义 Web 图床”</strong>，并按下图及说明参数进行配置：
+              在 PicList 左侧“图床设置”中选择 <strong>“高级自定义”</strong>，按下表逐项填写：
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "8px 16px", fontSize: 13 }}>
-                <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, display: "flex", alignItems: "center" }}>API 地址 (URL)</div>
-                <div style={{ fontFamily: "monospace", background: "var(--color-bg-input)", border: "1px solid var(--color-border)", padding: "6px 12px", borderRadius: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>{origin}/api/upload</span>
-                  <button className="btn btn--primary btn--sm" style={{ padding: "2px 8px", fontSize: 11, height: "auto" }} onClick={() => handleCopy(`${origin}/api/upload`)}>复制</button>
-                </div>
+            <div style={{ display: "grid", gridTemplateColumns: "150px 1fr", gap: "6px 12px", fontSize: 13, padding: "10px 14px", background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)" }}>
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>配置名</div>
+              <div style={{ color: "var(--color-text-secondary)" }}>随意取，如 <code style={{ fontFamily: "monospace" }}>MomoImage</code></div>
 
-                <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, display: "flex", alignItems: "center" }}>POST 参数名</div>
-                <div style={{ fontFamily: "monospace", background: "var(--color-bg-input)", border: "1px solid var(--color-border)", padding: "6px 12px", borderRadius: 4 }}>
-                  file
-                </div>
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>上传脚本名称</div>
+              <div style={{ color: "var(--color-text-tertiary)" }}>留空</div>
 
-                <div style={{ color: "var(--color-text-secondary)", fontWeight: 500, display: "flex", alignItems: "center" }}>JSON 路径</div>
-                <div style={{ fontFamily: "monospace", background: "var(--color-bg-input)", border: "1px solid var(--color-border)", padding: "6px 12px", borderRadius: 4 }}>
-                  data.url
-                </div>
-
-                <div style={{ color: "var(--color-text-secondary)", fontWeight: 500 }}>自定义请求头 (Headers)</div>
-                <div style={{ position: "relative" }}>
-                  <pre className="code-block" style={{ margin: 0, paddingRight: 60 }}>
-                    {picgoJson}
-                    <button className="copy-btn" onClick={() => handleCopy(picgoJson)}>复制</button>
-                  </pre>
-                  <span style={{ fontSize: 11, color: "var(--color-text-tertiary)", display: "block", marginTop: 4 }}>
-                    * 注意：请将括号及其中的中文替换为您在后台生成的真实 API Token 值
-                  </span>
-                </div>
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>接口网址</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontFamily: "monospace", color: "var(--color-primary)" }}>{origin}/api/upload</span>
+                <button className="btn btn--primary btn--sm" style={{ padding: "2px 8px", fontSize: 11, height: "auto" }} onClick={() => handleCopy(`${origin}/api/upload`)}>复制</button>
               </div>
+
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>请求方法</div>
+              <div style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>POST</div>
+
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>表单参数名</div>
+              <div style={{ fontFamily: "monospace", color: "var(--color-text-primary)" }}>file</div>
+
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>请求头</div>
+              <div style={{ position: "relative" }}>
+                <pre className="code-block" style={{ margin: 0, paddingRight: 60 }}>
+                  {headersJson}
+                  <button className="copy-btn" onClick={() => handleCopy(headersJson)}>复制</button>
+                </pre>
+              </div>
+
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>请求体</div>
+              <div style={{ color: "var(--color-text-tertiary)" }}>留空（表单上传，不需要 JSON body）</div>
+
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>自定义前缀</div>
+              <div style={{ color: "var(--color-text-tertiary)" }}>留空</div>
+
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>网站路径</div>
+              <div style={{ color: "var(--color-text-tertiary)" }}>留空</div>
+
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500 }}>返回数据URL路径</div>
+              <div style={{ fontFamily: "monospace", color: "var(--color-text-primary)" }}>data.url</div>
             </div>
+            <span style={{ fontSize: 11, color: "var(--color-text-tertiary)", display: "block", marginTop: 8 }}>
+              * 请将 <code style={{ fontFamily: "monospace" }}>&lt;您的 API Token&gt;</code> 替换为后台生成的真实 Token 值
+            </span>
           </div>
 
-          {/* 四、快捷代码与脚本调用 */}
+          {/* 四、指定存储与文件夹 */}
           <div className="help-section">
-            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>四、快捷代码与脚本调用</h3>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>四、指定存储与文件夹（可选）</h3>
+            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, marginBottom: 10 }}>
+              在“接口网址”后追加 query 参数，可让上传走指定存储后端、归入指定分类文件夹：
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "6px 12px", fontSize: 13, padding: "10px 14px", background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)" }}>
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500, fontFamily: "monospace" }}>?storage=&lt;存储ID&gt;</div>
+              <div style={{ color: "var(--color-text-secondary)" }}>指定存储后端。在“存储”页对应项点“复制 ID”获取</div>
+
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500, fontFamily: "monospace" }}>?folderId=&lt;文件夹ID&gt;</div>
+              <div style={{ color: "var(--color-text-secondary)" }}>指定文件夹。在“图库”页文件夹卡片点“复制”获取</div>
+
+              <div style={{ color: "var(--color-text-tertiary)", fontWeight: 500, fontFamily: "monospace" }}>?folderName=&lt;文件夹名&gt;</div>
+              <div style={{ color: "var(--color-text-secondary)" }}>按名字查找文件夹，找不到则自动新建（无需提前建）</div>
+            </div>
+            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, marginTop: 12, marginBottom: 6 }}>
+              <strong>示例</strong>（用文件夹名“截图”，自动创建/复用）：
+            </p>
+            <div className="code-block" style={{ paddingRight: 60 }}>
+              {folderExample}
+              <button className="copy-btn" onClick={() => handleCopy(folderExample)}>复制</button>
+            </div>
+            <span style={{ fontSize: 11, color: "var(--color-text-tertiary)", display: "block", marginTop: 6 }}>
+              * folderName 与 folderId 同时出现时 folderId 优先；folderName 含中文/空格时需 URL 编码
+            </span>
+          </div>
+
+          {/* 五、代码调用示例 */}
+          <div className="help-section">
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>五、代码调用示例</h3>
 
             <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, marginBottom: 6 }}>
               <strong>1. cURL 命令行上传：</strong>

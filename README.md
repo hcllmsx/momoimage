@@ -13,17 +13,32 @@
 在**项目根目录**任选其一：
 
 ```bash
-npm run dev:cf        # Cloudflare 版：wrangler(8787) + vite(5173)
-npm run dev:vercel    # Vercel 版：  vercel(3000)  + vite(5173)
+npm run dev:cf        # Cloudflare 版：wrangler(50000) + vite(50001)
+npm run dev:vercel    # Vercel 版：  vercel dev(50002) + vite(50003)
 ```
+
+两个版本都是**双进程**架构，浏览器访问对应的 **Vite 前端端口**（Cloudflare 版 `50001`、Vercel 版 `50003`）。
+
+### 本地开发端口分配
+
+为避免与常用端口冲突，本地开发端口从 `50000` 开始分配，可在 `scripts/dev.mjs` 的 `PORTS` 常量中修改：
+
+| 端口 | 用途 |
+| :--- | :--- |
+| `50000` | Cloudflare wrangler（后端 API） |
+| `50001` | Cloudflare vite（前端热更新，**浏览器访问**） |
+| `50002` | Vercel vercel dev（后端 API） |
+| `50003` | Vercel vite（前端热更新，**浏览器访问**） |
 
 脚本会自动完成：
 1. **同步版本号** — 读 `VERSION`，同步到所有 `package.json` / `package-lock.json`
-2. **并行启动后端与前端** — 后端跑 API，前端跑 Vite 热更新
-3. **浏览器访问** `http://localhost:5173` 即可（Vite 自动代理 `/api` 到后端）
+2. **启动后端 + 前端**：
+   - Cloudflare 版：wrangler dev（API，50000）+ vite dev（前端，50001）
+   - Vercel 版：vercel dev（API，50002）+ vite dev（前端，50003）
+3. Vite 会自动把 `/api` 和 `/i` 请求代理到后端端口
 4. **Ctrl+C 一次性退出**所有进程
 
-> Vercel 版首次运行前需在 `vercel/` 目录执行一次 `vercel link` 关联项目，之后即可用根目录脚本启动。
+> Vercel 版首次运行前需在 `vercel/` 目录执行一次 `vercel link` 关联项目（项目名填 `momoimage`，可用 `vercel project ls` 确认）。本地开发脚本会自动注入会话级 `JWT_SECRET`，默认密码 `momoimage`，无需 `.env.local` 即可运行。如需连接线上 KV / Blob 的真实数据，参见下方 [Vercel 版本部署步骤](#2-vercel-版本部署步骤)。
 
 ### 发版 / 改版本号
 
@@ -56,10 +71,10 @@ npm run dev:cf
 ```
 
 脚本会自动同步版本号，然后在 `cloudflare/` 目录并行启动：
-- **后端** Wrangler dev（`http://localhost:8787`，本地模拟 KV/R2）
-- **前端** Vite dev（`http://localhost:5173`，热更新）
+- **后端** Wrangler dev（`http://localhost:50000`，本地模拟 KV/R2）
+- **前端** Vite dev（`http://localhost:50001`，热更新，**浏览器访问此端口**）
 
-浏览器访问 `http://localhost:5173` 即可，Vite 会自动将 `/api` 请求代理至 8787 后端。按 `Ctrl+C` 一次性退出所有服务。
+Vite 会自动将 `/api` 请求代理至 50000 后端。按 `Ctrl+C` 一次性退出所有服务。
 
 > 首次运行前请在 `cloudflare/` 目录执行一次 `npm install` 安装依赖。
 
@@ -94,13 +109,57 @@ Vercel 版代码管理在 `vercel/` 目录下。
 npm run dev:vercel
 ```
 
-脚本会自动同步版本号，然后在 `vercel/` 目录并行启动：
-- **后端** Vercel dev（`http://localhost:3000`，从云端拉取环境变量与存储连接）
-- **前端** Vite dev（`http://localhost:5173`，热更新）
+脚本会自动完成：
+1. **同步版本号** — 读 `VERSION`，同步到所有 `package.json` / `package-lock.json`
+2. **自动注入 `JWT_SECRET`** — 为本次开发会话生成一个稳定的 JWT 签名密钥，避免 Vercel edge runtime 冷启动导致登录后被踢出
+3. **加载 `vercel/.env.local`**（如果存在）— 把本地环境变量注入 `vercel dev` 子进程（详见下方说明）
+4. **启动双进程**：
+   - **vercel dev**（`http://localhost:50002`，提供 serverless API）
+   - **vite dev**（`http://localhost:50003`，前端热更新，自动把 `/api`、`/i` 代理到 50002，**浏览器访问此端口**）
 
-浏览器访问 `http://localhost:5173` 即可，Vite 会自动将 `/api` 请求代理至 3000 后端。按 `Ctrl+C` 一次性退出所有服务。
+浏览器访问 `http://localhost:50003` 即可。按 `Ctrl+C` 一次性退出所有服务。
 
-> 首次运行前需在 `vercel/` 目录执行一次 `npm install` 与 `vercel link`（关联项目，用于拉取环境变量）。`vercel dev` 本地上传和读写会实时作用于您绑定的真实 Vercel KV 和 Vercel Blob。
+**登录密码**：未配置 `ADMIN_PASSWORD` 时默认为 `momoimage`。
+
+> 首次运行前需在 `vercel/` 目录执行一次 `npm install` 与 `vercel link`（关联项目，项目名填 `momoimage`）。
+
+#### 关于 `vercel link` 关联项目
+
+`vercel link` 会把本地 `vercel/` 目录关联到一个线上 Vercel 项目。关联信息保存在 `vercel/.vercel/project.json`（已被 `.gitignore` 忽略）。
+
+如果关联错了项目（例如项目名填成了 `vercel` 而不是 `momoimage`），`vercel dev` 会从错误项目拉取环境变量，导致本地无法正常工作。重新关联的方法：
+
+```bash
+# 删除旧关联
+Remove-Item -Recurse -Force vercel/.vercel
+Remove-Item -Force vercel/.env.local
+
+# 重新关联到正确项目（项目名必须是线上实际存在的项目名）
+cd vercel
+vercel link --project momoimage --yes
+```
+
+可以用 `vercel project ls` 查看账号下的所有项目及其线上 URL，确认要关联的正确项目名。
+
+#### 关于本地环境变量与 `.env.local`
+
+**默认情况下不需要 `.env.local`** —— 本地用默认密码 `momoimage` + 无 KV/Blob 存储，前端调试和基础功能完全正常。
+
+**为什么不能自动拉取线上凭证？** Vercel 对 Sensitive 环境变量（`ADMIN_PASSWORD`、`KV_URL`、`BLOB_READ_WRITE_TOKEN` 等）有安全保护：即使执行 `vercel env pull`，拉到本地的值也是 `[SENSITIVE]` 占位符而非真实值。因此无法通过 CLI 自动获取线上凭证到本地。
+
+**如需在本地连真实 KV/Blob**，需手动创建 `vercel/.env.local`（已被 `.gitignore` 忽略）并填入真实凭证：
+
+```bash
+# vercel/.env.local
+ADMIN_PASSWORD=你的线上密码
+# Upstash Redis（从 https://console.upstash.com 的 KV 实例详情页复制）
+UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=xxx
+# Vercel Blob（从 Vercel 控制台 → Storage → Blob 详情页复制）
+BLOB_READ_WRITE_TOKEN=xxx
+```
+
+`dev.mjs` 启动时会读取此文件并注入 `vercel dev` 子进程，API 即可使用真实凭证。
 
 ---
 
