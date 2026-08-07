@@ -847,7 +847,7 @@ code {
   position: fixed;
   top: 72px;
   right: 24px;
-  z-index: 2000;
+  z-index: 10000;
   display: flex;
   flex-direction: column;
   gap: 8px;

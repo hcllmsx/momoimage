@@ -875,9 +875,19 @@ function TokenCreatedModal({ token, onClose }: { token: string; onClose: () => v
     }
   };
 
+  // 复制鉴权头（JSON 格式：{"Authorization": "Token <token>"}），方便直接粘贴到请求头使用
+  const handleCopyAuth = async () => {
+    const authHeader = `{"Authorization": "Token ${token}"}`;
+    try {
+      await navigator.clipboard.writeText(authHeader);
+      showToast("鉴权头已复制到剪贴板", "success");
+    } catch {
+      showToast("复制失败，请手动选择复制", "error");
+    }
+  };
+
   return (
     <div
-      onClick={onClose}
       style={{
         position: "fixed",
         top: 0,
@@ -992,8 +1002,8 @@ function TokenCreatedModal({ token, onClose }: { token: string; onClose: () => v
 
         {/* 操作按钮 */}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <button className="btn btn--primary" onClick={handleCopy} style={{ minWidth: 110 }}>
-            复制 Token
+          <button className="btn btn--primary" onClick={handleCopyAuth} style={{ minWidth: 110 }}>
+            复制鉴权头
           </button>
           <button className="btn" onClick={onClose} style={{ minWidth: 80 }}>
             关闭
