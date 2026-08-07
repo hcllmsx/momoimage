@@ -747,6 +747,8 @@ function TokenManager() {
   const [loading, setLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [newToken, setNewToken] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { showToast } = useToastContext();
 
   useEffect(() => {
@@ -771,14 +773,23 @@ function TokenManager() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("确定要删除这个 Token 吗？")) return;
+  const handleDelete = (id: string) => {
+    const target = tokens.find((t) => t.id === id);
+    setDeleteTarget({ id, name: target?.name ?? "" });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await api.deleteApiToken(id);
-      setTokens((prev) => prev.filter((t) => t.id !== id));
+      await api.deleteApiToken(deleteTarget.id);
+      setTokens((prev) => prev.filter((t) => t.id !== deleteTarget.id));
       showToast("Token 已删除", "success");
+      setDeleteTarget(null);
     } catch (err) {
       showToast("删除失败", "error");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -845,6 +856,14 @@ function TokenManager() {
 
       {showHelp && <TokenHelpModal onClose={() => setShowHelp(false)} />}
       {newToken && <TokenCreatedModal token={newToken} onClose={() => setNewToken(null)} />}
+      {deleteTarget && (
+        <TokenDeleteConfirmModal
+          tokenName={deleteTarget.name}
+          loading={deleting}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -853,6 +872,26 @@ function TokenManager() {
 function TokenCreatedModal({ token, onClose }: { token: string; onClose: () => void }) {
   const { showToast } = useToastContext();
   const inputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // 点击遮罩层时让弹窗晃动几下，提示用户只能通过"关闭"按钮关闭，防止误触丢失未复制的 Token
+  const handleOverlayClick = () => {
+    const el = modalRef.current;
+    if (!el) return;
+    el.animate(
+      [
+        { transform: "translateX(0)" },
+        { transform: "translateX(-10px)" },
+        { transform: "translateX(10px)" },
+        { transform: "translateX(-8px)" },
+        { transform: "translateX(8px)" },
+        { transform: "translateX(-5px)" },
+        { transform: "translateX(5px)" },
+        { transform: "translateX(0)" },
+      ],
+      { duration: 400, easing: "ease-in-out" }
+    );
+  };
 
   const handleCopy = async () => {
     try {
@@ -887,6 +926,7 @@ function TokenCreatedModal({ token, onClose }: { token: string; onClose: () => v
 
   return (
     <div
+      onClick={handleOverlayClick}
       style={{
         position: "fixed",
         top: 0,
@@ -908,6 +948,7 @@ function TokenCreatedModal({ token, onClose }: { token: string; onClose: () => v
         @keyframes tokenScaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
       `}</style>
       <div
+        ref={modalRef}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "90%",
@@ -1006,6 +1047,98 @@ function TokenCreatedModal({ token, onClose }: { token: string; onClose: () => v
           </button>
           <button className="btn" onClick={onClose} style={{ minWidth: 80 }}>
             关闭
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ========= Token 删除确认弹窗 =========
+function TokenDeleteConfirmModal({
+  tokenName,
+  loading,
+  onConfirm,
+  onCancel,
+}: {
+  tokenName: string;
+  loading: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+        animation: "tokenFadeIn 0.2s ease",
+      }}
+    >
+      <style>{`
+        @keyframes tokenFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes tokenScaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      `}</style>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "90%",
+          maxWidth: 420,
+          background: "var(--color-bg-elevated)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-lg)",
+          boxShadow: "var(--shadow-lg)",
+          padding: "24px 28px",
+          position: "relative",
+          animation: "tokenScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
+      >
+        {/* 头部图标 + 标题 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: "50%",
+            background: "rgba(239, 68, 68, 0.12)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 20, flexShrink: 0,
+          }}>⚠️</div>
+          <div>
+            <h2 style={{ fontSize: 17, fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
+              确认删除 Token
+            </h2>
+            <p style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginTop: 2, marginBottom: 0 }}>
+              删除后使用该 Token 的请求将立即失效
+            </p>
+          </div>
+        </div>
+
+        {/* 描述 */}
+        <div style={{
+          fontSize: 13,
+          color: "var(--color-text-secondary)",
+          lineHeight: 1.6,
+          marginBottom: 20,
+        }}>
+          确定要删除 Token <strong style={{ color: "var(--color-text-primary)" }}>{tokenName || "(未命名)"}</strong> 吗？<br />
+          此操作不可撤销，删除后该 Token 将立即失效，使用它的请求会被拒绝。
+        </div>
+
+        {/* 操作按钮 */}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button className="btn" onClick={onCancel} style={{ minWidth: 80 }} disabled={loading}>
+            取消
+          </button>
+          <button className="btn btn--danger" onClick={onConfirm} style={{ minWidth: 100 }} disabled={loading}>
+            {loading ? "删除中..." : "确认删除"}
           </button>
         </div>
       </div>
